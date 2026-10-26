@@ -37,6 +37,21 @@ func TestLoadRejectsPublicAPIHost(t *testing.T) {
 	}
 }
 
+func TestLoadValidatesAlertScoreThreshold(t *testing.T) {
+	t.Setenv("ALERT_SCORE_THRESHOLD", "82.5")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.AlertScoreThreshold != 82.5 {
+		t.Fatalf("AlertScoreThreshold = %v, want 82.5", cfg.AlertScoreThreshold)
+	}
+	t.Setenv("ALERT_SCORE_THRESHOLD", "NaN")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted a NaN alert threshold")
+	}
+}
+
 func TestDatabaseURLEncodesCredentials(t *testing.T) {
 	t.Setenv("DB_USER", "user@example")
 	t.Setenv("DB_PASSWORD", "p@ss:/?")

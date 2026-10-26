@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,16 +17,49 @@ import (
 )
 
 type HealthHandler struct {
-	db     *sql.DB
-	stocks *repository.Stocks
-	data   *repository.MarketData
+	db            *sql.DB
+	stocks        *repository.Stocks
+	data          *repository.MarketData
+	backtestSlots chan struct{}
+	backtestCtx   context.Context
+	backtestWG    sync.WaitGroup
 }
 
-func NewHandler(db *sql.DB) http.Handler {
-	handler := &HealthHandler{db: db, stocks: repository.NewStocks(db), data: repository.NewMarketData(db)}
-	return http.TimeoutHandler(HandlerWithOptions(handler, StdHTTPServerOptions{
+type Application struct {
+	handler http.Handler
+	cancel  context.CancelFunc
+	health  *HealthHandler
+}
+
+func NewHandler(db *sql.DB) *Application {
+	ctx, cancel := context.WithCancel(context.Background())
+	health := &HealthHandler{
+		db: db, stocks: repository.NewStocks(db), data: repository.NewMarketData(db),
+		backtestSlots: make(chan struct{}, 2), backtestCtx: ctx,
+	}
+	handler := http.TimeoutHandler(HandlerWithOptions(health, StdHTTPServerOptions{
 		BaseURL: "/api/v1",
 	}), 30*time.Second, `{"error":"request timed out"}`)
+	return &Application{handler: handler, cancel: cancel, health: health}
+}
+
+func (a *Application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.handler.ServeHTTP(w, r)
+}
+
+func (a *Application) Shutdown(ctx context.Context) error {
+	a.cancel()
+	done := make(chan struct{})
+	go func() {
+		a.health.backtestWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (h *HealthHandler) GetHealthLive(w http.ResponseWriter, _ *http.Request) {
@@ -153,6 +187,23 @@ func (h *HealthHandler) GetRankings(w http.ResponseWriter, r *http.Request, para
 	if params.Sector != nil {
 		sector = *params.Sector
 	}
+	search, sortBy := "", "score"
+	if params.Search != nil {
+		search = *params.Search
+		if len(search) > 100 {
+			writeError(w, http.StatusBadRequest, "invalid_search", "search must not exceed 100 characters")
+			return
+		}
+	}
+	if params.Sort != nil {
+		sortBy = string(*params.Sort)
+	}
+	switch sortBy {
+	case "score", "momentum", "volatility":
+	default:
+		writeError(w, http.StatusBadRequest, "invalid_sort", "sort must be score, momentum, or volatility")
+		return
+	}
 	if params.MinimumScore != nil && (*params.MinimumScore < 0 || *params.MinimumScore > 100) {
 		writeError(w, http.StatusBadRequest, "invalid_score", "minimum_score must be between 0 and 100")
 		return
@@ -176,7 +227,8 @@ func (h *HealthHandler) GetRankings(w http.ResponseWriter, r *http.Request, para
 		minimumScore = &value
 	}
 	affordableOnly := params.AffordableOnly != nil && *params.AffordableOnly
-	entries, total, err := h.data.Rankings(r.Context(), rankingDate, strategyName, minimumScore, sector, affordableOnly, limit, offset)
+	entries, total, err := h.data.Rankings(r.Context(), rankingDate, strategyName,
+		minimumScore, sector, search, sortBy, affordableOnly, limit, offset)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "query stock rankings failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error", "unable to retrieve rankings")

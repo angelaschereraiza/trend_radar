@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { api, type JobRun } from '../api'
 
 interface RankingEntry {
   stock_id: string
@@ -19,6 +21,8 @@ const rankings = ref<RankingEntry[]>([])
 const total = ref(0)
 const loading = ref(true)
 const error = ref('')
+const jobs = ref<JobRun[]>([])
+const jobsError = ref('')
 
 onMounted(async () => {
   try {
@@ -33,6 +37,12 @@ onMounted(async () => {
     error.value = cause instanceof Error ? cause.message : 'Rankings could not be loaded.'
   } finally {
     loading.value = false
+  }
+  try {
+    const jobPage = await api<{ items: JobRun[] }>('/jobs?limit=5')
+    jobs.value = jobPage.items
+  } catch (cause) {
+    jobsError.value = cause instanceof Error ? cause.message : 'Job status could not be loaded.'
   }
 })
 </script>
@@ -138,5 +148,52 @@ onMounted(async () => {
         Total managed capital is capped at CHF 5,000.
       </p>
     </section>
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">
+            System activity
+          </p><h2>Recent jobs</h2>
+        </div>
+        <RouterLink to="/alerts">View alerts</RouterLink>
+      </div>
+      <p
+        v-if="jobsError"
+        role="alert"
+        class="message error"
+      >
+        {{ jobsError }}
+      </p>
+      <p
+        v-if="jobs.length === 0"
+        class="message"
+      >
+        No scheduled job activity is recorded yet. Start the worker with <code>--schedule</code> to process the queue.
+      </p>
+      <ul
+        v-else
+        class="job-list"
+      >
+        <li
+          v-for="job in jobs"
+          :key="job.id"
+        >
+          <strong>{{ job.job_name.replaceAll('_', ' ') }}</strong>
+          <span>{{ job.status }}</span>
+          <time :datetime="job.scheduled_for">{{ new Date(job.scheduled_for).toLocaleString() }}</time>
+          <small
+            v-if="job.error_message"
+            class="error"
+          >{{ job.error_message }}</small>
+        </li>
+      </ul>
+    </section>
+    <nav
+      class="quick-links"
+      aria-label="Research workflows"
+    >
+      <RouterLink to="/stocks">Explore stocks</RouterLink>
+      <RouterLink to="/strategies">Configure a strategy and backtest</RouterLink>
+    </nav>
   </section>
 </template>

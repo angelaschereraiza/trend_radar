@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -62,5 +63,32 @@ func TestUnknownRouteReturnsNotFound(t *testing.T) {
 	NewHandler(nil).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/missing", nil))
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
+
+func TestCreateStrategyRejectsCapitalAboveLimit(t *testing.T) {
+	body := `{"name":"test","version":"1","parameters":{"initial_capital_chf":"5000.01","max_positions":10,"rank_buffer":15,"max_holding_months":3,"min_trade_value_chf":"150"}}`
+	recorder := httptest.NewRecorder()
+	NewHandler(nil).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/strategies", strings.NewReader(body)))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (body %s)", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+}
+
+func TestCreateStrategyRejectsUnknownFields(t *testing.T) {
+	body := `{"name":"test","version":"1","unexpected":true,"parameters":{"initial_capital_chf":"5000","max_positions":10,"rank_buffer":15,"max_holding_months":3,"min_trade_value_chf":"150"}}`
+	recorder := httptest.NewRecorder()
+	NewHandler(nil).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/strategies", strings.NewReader(body)))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+}
+
+func TestCreateBacktestRequiresExplicitHoldoutConfirmation(t *testing.T) {
+	body := `{"strategy_id":"00000000-0000-4000-8000-000000000001","start_date":"2024-01-01","end_date":"2024-02-01","dataset_role":"holdout"}`
+	recorder := httptest.NewRecorder()
+	NewHandler(nil).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/backtests", strings.NewReader(body)))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (body %s)", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
 }

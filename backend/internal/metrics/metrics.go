@@ -25,6 +25,10 @@ type Report struct {
 	AverageTradeReturn   float64         `json:"average_trade_return"`
 	Turnover             float64         `json:"turnover"`
 	TotalFeesCHF         decimal.Decimal `json:"total_fees_chf"`
+	CommissionCHF        decimal.Decimal `json:"commission_chf"`
+	FXCostCHF            decimal.Decimal `json:"fx_cost_chf"`
+	StampDutyCHF         decimal.Decimal `json:"stamp_duty_chf"`
+	SlippageCHF          decimal.Decimal `json:"slippage_chf"`
 	WithholdingTaxCHF    decimal.Decimal `json:"withholding_tax_chf"`
 	BenchmarkReturn      float64         `json:"benchmark_return"`
 	ExcessReturn         float64         `json:"excess_return"`
@@ -43,8 +47,13 @@ func Calculate(result backtest.Result, config Config) (Report, error) {
 	first, last := result.Equity[0], result.Equity[len(result.Equity)-1]
 	report := Report{
 		TotalFeesCHF:      decimal.Zero,
+		CommissionCHF:     decimal.Zero,
+		FXCostCHF:         decimal.Zero,
+		StampDutyCHF:      decimal.Zero,
+		SlippageCHF:       decimal.Zero,
 		WithholdingTaxCHF: decimal.Zero,
 	}
+	report.WithholdingTaxCHF = result.WithholdingTaxCHF
 	if first.PortfolioCHF.IsPositive() {
 		report.TotalReturn = last.PortfolioCHF.Div(first.PortfolioCHF).Sub(decimal.NewFromInt(1)).InexactFloat64()
 	}
@@ -98,6 +107,11 @@ func Calculate(result backtest.Result, config Config) (Report, error) {
 		report.CalmarRatio = report.CAGR / report.MaximumDrawdown
 	}
 	closedReturns := tradeReturns(result.Fills)
+	for _, action := range result.CorporateActions {
+		if action.Type == "delisting" && action.GrossCHF.IsZero() && action.CostBasisCHF.IsPositive() {
+			closedReturns = append(closedReturns, -1)
+		}
+	}
 	if len(closedReturns) > 0 {
 		wins := 0
 		for _, value := range closedReturns {
@@ -113,6 +127,10 @@ func Calculate(result backtest.Result, config Config) (Report, error) {
 	for _, fill := range result.Fills {
 		totalTurnover = totalTurnover.Add(fill.GrossCHF)
 		report.TotalFeesCHF = report.TotalFeesCHF.Add(fill.Costs.Total)
+		report.CommissionCHF = report.CommissionCHF.Add(fill.Costs.Commission)
+		report.FXCostCHF = report.FXCostCHF.Add(fill.Costs.FXCost)
+		report.StampDutyCHF = report.StampDutyCHF.Add(fill.Costs.StampDuty)
+		report.SlippageCHF = report.SlippageCHF.Add(fill.Costs.Slippage)
 	}
 	averageValue := decimal.Zero
 	for _, point := range result.Equity {

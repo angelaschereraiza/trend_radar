@@ -13,13 +13,25 @@ import (
 )
 
 type Config struct {
-	Strategy strategy.Config
-	Costs    CostConfig
+	Strategy                     strategy.Config
+	Costs                        CostConfig
+	BankruptcyRecoveryRate       decimal.Decimal
+	UnknownDelistingRecoveryRate decimal.Decimal
+}
+
+func DefaultConfig(strategyConfig strategy.Config) Config {
+	return Config{
+		Strategy:                     strategyConfig,
+		Costs:                        DefaultCosts(),
+		BankruptcyRecoveryRate:       decimal.Zero,
+		UnknownDelistingRecoveryRate: decimal.RequireFromString("0.70"),
+	}
 }
 
 type MarketDay struct {
 	Date              time.Time
 	DecisionDate      time.Time
+	RankingsAsOfDate  time.Time
 	Rebalance         bool
 	Rankings          []strategy.Candidate
 	OpenPricesUSD     map[string]decimal.Decimal
@@ -27,6 +39,26 @@ type MarketDay struct {
 	USDCHF            decimal.Decimal
 	BenchmarkOpenUSD  decimal.Decimal
 	BenchmarkCloseUSD decimal.Decimal
+	CorporateActions  []CorporateAction
+}
+
+type CorporateAction struct {
+	Symbol string
+	Type   string
+	Reason string
+	Amount decimal.Decimal
+	Ratio  decimal.Decimal
+}
+
+type CorporateActionRecord struct {
+	Symbol         string
+	Date           time.Time
+	Type           string
+	QuantityBefore decimal.Decimal
+	QuantityAfter  decimal.Decimal
+	GrossCHF       decimal.Decimal
+	WithholdingCHF decimal.Decimal
+	CostBasisCHF   decimal.Decimal
 }
 
 type Order struct {
@@ -73,12 +105,14 @@ type Position struct {
 }
 
 type Result struct {
-	Orders       []Order
-	Fills        []Fill
-	Ledger       []LedgerEntry
-	Equity       []EquityPoint
-	FinalCashCHF decimal.Decimal
-	Positions    map[string]Position
+	Orders            []Order
+	Fills             []Fill
+	Ledger            []LedgerEntry
+	Equity            []EquityPoint
+	CorporateActions  []CorporateActionRecord
+	FinalCashCHF      decimal.Decimal
+	WithholdingTaxCHF decimal.Decimal
+	Positions         map[string]Position
 }
 
 func Run(days []MarketDay, config Config) (Result, error) {
@@ -87,6 +121,9 @@ func Run(days []MarketDay, config Config) (Result, error) {
 	}
 	if err := config.Costs.Validate(); err != nil {
 		return Result{}, err
+	}
+	if !validRate(config.BankruptcyRecoveryRate) || !validRate(config.UnknownDelistingRecoveryRate) {
+		return Result{}, errors.New("delisting recovery rates must be between zero and one")
 	}
 	if len(days) == 0 {
 		return Result{}, errors.New("backtest requires at least one market day")
@@ -97,6 +134,7 @@ func Run(days []MarketDay, config Config) (Result, error) {
 	_ = ledger
 	var benchmarkQuantity, benchmarkCash decimal.Decimal
 	benchmarkInitialized := false
+	var err error
 
 	for i, day := range days {
 		if day.Date.IsZero() || (i > 0 && !day.Date.After(days[i-1].Date)) {
@@ -108,14 +146,25 @@ func Run(days []MarketDay, config Config) (Result, error) {
 		if day.Rebalance && (day.DecisionDate.IsZero() || !day.DecisionDate.Before(day.Date)) {
 			return Result{}, fmt.Errorf("rebalance on %s must use a strictly earlier decision date", day.Date.Format("2006-01-02"))
 		}
+		if day.Rebalance && (day.RankingsAsOfDate.IsZero() || !day.RankingsAsOfDate.Equal(day.DecisionDate)) {
+			return Result{}, fmt.Errorf("rebalance rankings must be calculated as of the decision date on %s",
+				day.Date.Format("2006-01-02"))
+		}
+		cash, err = applyCorporateActions(day, config, &result, cash)
+		if err != nil {
+			return Result{}, err
+		}
 		if day.Rebalance {
-			var err error
 			cash, err = rebalance(day, config, &result, cash)
 			if err != nil {
 				return Result{}, err
 			}
 		}
-		if !benchmarkInitialized && day.BenchmarkOpenUSD.IsPositive() && day.USDCHF.IsPositive() {
+		if !benchmarkInitialized {
+			if !day.BenchmarkOpenUSD.IsPositive() || !day.USDCHF.IsPositive() {
+				return Result{}, fmt.Errorf("benchmark open price and FX rate are required on initial date %s",
+					day.Date.Format("2006-01-02"))
+			}
 			unitValue := day.BenchmarkOpenUSD.Mul(day.USDCHF)
 			quantity, costs, err := affordableQuantity(config.Strategy.InitialCapitalCHF, unitValue, config.Costs, true)
 			if err != nil {
@@ -133,10 +182,132 @@ func Run(days []MarketDay, config Config) (Result, error) {
 		result.Equity = append(result.Equity, point)
 	}
 	result.FinalCashCHF = cash
-	if err := validateLedger(result.Ledger, config.Strategy.InitialCapitalCHF, result.Equity); err != nil {
+	if err := validateLedger(result.Ledger, config.Strategy.InitialCapitalCHF, cash, result.Equity); err != nil {
 		return Result{}, err
 	}
 	return result, nil
+}
+
+func applyCorporateActions(day MarketDay, config Config, result *Result, cash decimal.Decimal) (decimal.Decimal, error) {
+	for _, action := range day.CorporateActions {
+		if action.Symbol == "" {
+			return cash, errors.New("corporate action requires a symbol")
+		}
+		position, held := result.Positions[action.Symbol]
+		switch action.Type {
+		case "split":
+			if !action.Ratio.IsPositive() {
+				return cash, fmt.Errorf("split ratio must be positive for %s", action.Symbol)
+			}
+			if !held {
+				continue
+			}
+			quantityBefore := position.Quantity
+			position.Quantity = position.Quantity.Mul(action.Ratio)
+			result.Positions[action.Symbol] = position
+			result.CorporateActions = append(result.CorporateActions, CorporateActionRecord{
+				Symbol: action.Symbol, Date: day.Date, Type: action.Type,
+				QuantityBefore: quantityBefore, QuantityAfter: position.Quantity,
+			})
+		case "dividend":
+			if action.Amount.IsNegative() {
+				return cash, fmt.Errorf("dividend amount must be non-negative for %s", action.Symbol)
+			}
+			if !held || action.Amount.IsZero() {
+				continue
+			}
+			if !day.USDCHF.IsPositive() {
+				return cash, fmt.Errorf("missing valid FX rate for dividend on %s", action.Symbol)
+			}
+			gross := position.Quantity.Mul(action.Amount).Mul(day.USDCHF)
+			withholding := gross.Mul(config.Costs.WithholdingRate)
+			cash = cash.Add(gross).Sub(withholding)
+			appendCashLedger(result, day.Date, "dividend", gross)
+			if withholding.IsPositive() {
+				appendCashLedger(result, day.Date, "withholding_tax", withholding.Neg())
+			}
+			result.WithholdingTaxCHF = result.WithholdingTaxCHF.Add(withholding)
+			result.CorporateActions = append(result.CorporateActions, CorporateActionRecord{
+				Symbol: action.Symbol, Date: day.Date, Type: action.Type,
+				QuantityBefore: position.Quantity, QuantityAfter: position.Quantity,
+				GrossCHF: gross, WithholdingCHF: withholding,
+			})
+		case "delisting":
+			if action.Amount.IsNegative() {
+				return cash, fmt.Errorf("delisting amount must be non-negative for %s", action.Symbol)
+			}
+			if !held {
+				continue
+			}
+			if !day.USDCHF.IsPositive() {
+				return cash, fmt.Errorf("missing valid FX rate for delisting on %s", action.Symbol)
+			}
+			price := action.Amount
+			if !price.IsPositive() {
+				price = day.ClosePricesUSD[action.Symbol]
+				recovery := config.UnknownDelistingRecoveryRate
+				if action.Reason == "bankruptcy" {
+					recovery = config.BankruptcyRecoveryRate
+				}
+				if price.IsPositive() {
+					price = price.Mul(recovery)
+				} else {
+					price = decimal.Zero
+				}
+			}
+			gross := position.Quantity.Mul(price).Mul(day.USDCHF)
+			recordedGross := gross
+			if gross.IsPositive() {
+				costs, err := CalculateCosts(gross, config.Costs)
+				if err != nil {
+					return cash, err
+				}
+				if gross.LessThan(costs.Total) {
+					recordedGross = decimal.Zero
+					result.Orders = append(result.Orders, Order{
+						Symbol: action.Symbol, Date: day.Date, Side: "sell", Quantity: position.Quantity,
+						Reason: "delisting", Status: "rejected", RejectReason: "estimated costs exceed delisting proceeds",
+					})
+				} else {
+					cash = cash.Add(gross).Sub(costs.Total)
+					result.Fills = append(result.Fills, Fill{
+						Symbol: action.Symbol, Date: day.Date, Side: "sell", Quantity: position.Quantity,
+						PriceUSD: price, FXRate: day.USDCHF, GrossCHF: gross, Costs: costs,
+					})
+					result.Orders = append(result.Orders, Order{
+						Symbol: action.Symbol, Date: day.Date, Side: "sell", Quantity: position.Quantity,
+						Reason: "delisting", Status: "filled",
+					})
+					appendTradeLedger(result, day.Date, "sell", gross, costs, cash)
+				}
+			}
+			delete(result.Positions, action.Symbol)
+			result.CorporateActions = append(result.CorporateActions, CorporateActionRecord{
+				Symbol: action.Symbol, Date: day.Date, Type: action.Type,
+				QuantityBefore: position.Quantity, QuantityAfter: decimal.Zero,
+				GrossCHF: recordedGross, CostBasisCHF: position.EntryValue,
+			})
+		case "merger":
+			return cash, fmt.Errorf("merger action for %s requires an acquirer symbol and cannot be represented by this market-day model", action.Symbol)
+		default:
+			return cash, fmt.Errorf("unsupported corporate action type %q for %s", action.Type, action.Symbol)
+		}
+	}
+	return cash, nil
+}
+
+func appendCashLedger(result *Result, date time.Time, kind string, amount decimal.Decimal) {
+	balance := decimal.Zero
+	if len(result.Ledger) > 0 {
+		balance = result.Ledger[len(result.Ledger)-1].BalanceCHF
+	}
+	result.Ledger = append(result.Ledger, LedgerEntry{
+		Date: date, Type: kind, AmountCHF: amount, BalanceCHF: balance.Add(amount),
+	})
+}
+
+func validRate(rate decimal.Decimal) bool {
+	return !rate.IsNegative() && !rate.GreaterThan(decimal.NewFromInt(1))
 }
 
 func rebalance(day MarketDay, config Config, result *Result, cash decimal.Decimal) (decimal.Decimal, error) {
@@ -311,7 +482,11 @@ func markToMarket(day MarketDay, cash decimal.Decimal, positions map[string]Posi
 		invested = invested.Add(position.Quantity.Mul(price).Mul(day.USDCHF))
 	}
 	benchmark := benchmarkCash
-	if benchmarkQuantity.IsPositive() && day.BenchmarkCloseUSD.IsPositive() && day.USDCHF.IsPositive() {
+	if benchmarkQuantity.IsPositive() {
+		if !day.BenchmarkCloseUSD.IsPositive() || !day.USDCHF.IsPositive() {
+			return EquityPoint{}, fmt.Errorf("missing benchmark close price or FX rate on %s",
+				day.Date.Format("2006-01-02"))
+		}
 		benchmark = benchmark.Add(benchmarkQuantity.Mul(day.BenchmarkCloseUSD).Mul(day.USDCHF))
 	}
 	return EquityPoint{
@@ -335,9 +510,12 @@ func portfolioValue(day MarketDay, cash decimal.Decimal, positions map[string]Po
 	return value, nil
 }
 
-func validateLedger(ledger []LedgerEntry, initial decimal.Decimal, equity []EquityPoint) error {
+func validateLedger(ledger []LedgerEntry, initial, finalCash decimal.Decimal, equity []EquityPoint) error {
 	balance := decimal.Zero
 	for i := range ledger {
+		if i > 0 && ledger[i].Date.Before(ledger[i-1].Date) {
+			return fmt.Errorf("ledger dates are not chronological at entry %d", i)
+		}
 		balance = balance.Add(ledger[i].AmountCHF)
 		if !balance.Equal(ledger[i].BalanceCHF) {
 			return fmt.Errorf("ledger balance mismatch at entry %d: got %s, recorded %s", i, balance, ledger[i].BalanceCHF)
@@ -346,10 +524,26 @@ func validateLedger(ledger []LedgerEntry, initial decimal.Decimal, equity []Equi
 	if len(ledger) > 0 && !ledger[0].AmountCHF.Equal(initial) {
 		return errors.New("ledger does not start with initial capital")
 	}
+	if !balance.Equal(finalCash) {
+		return fmt.Errorf("ledger balance %s does not equal final cash %s", balance, finalCash)
+	}
+	ledgerIndex := 0
+	balance = decimal.Zero
 	for _, point := range equity {
 		if point.CashCHF.IsNegative() {
 			return fmt.Errorf("cash balance is negative on %s", point.Date.Format("2006-01-02"))
 		}
+		for ledgerIndex < len(ledger) && !ledger[ledgerIndex].Date.After(point.Date) {
+			balance = balance.Add(ledger[ledgerIndex].AmountCHF)
+			ledgerIndex++
+		}
+		if !balance.Equal(point.CashCHF) {
+			return fmt.Errorf("cash ledger balance %s does not match equity cash %s on %s",
+				balance, point.CashCHF, point.Date.Format("2006-01-02"))
+		}
+	}
+	if ledgerIndex != len(ledger) {
+		return errors.New("cash ledger contains entries after the final equity date")
 	}
 	return nil
 }

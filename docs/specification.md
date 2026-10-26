@@ -1358,6 +1358,7 @@ FX_API_KEY=
 
 BASE_CURRENCY=CHF
 MAX_CAPITAL_CHF=5000        # may be lowered, never raised above the compiled ceiling
+ALERT_SCORE_THRESHOLD=80    # score threshold for crossing alerts; 0-100
 
 LOG_LEVEL=info
 ```

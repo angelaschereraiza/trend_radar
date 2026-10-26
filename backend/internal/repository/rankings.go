@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -75,7 +76,15 @@ func (r *MarketData) SaveRanking(ctx context.Context, name, version string, date
 		return fmt.Errorf("begin ranking persistence: %w", err)
 	}
 	defer tx.Rollback()
-	parameters, err := json.Marshal(scoring.DefaultWeights())
+	parameters, err := json.Marshal(map[string]any{
+		"initial_capital_chf": "5000",
+		"max_positions":       10,
+		"rank_buffer":         15,
+		"max_holding_months":  3,
+		"min_trade_value_chf": "150",
+		"fractional_shares":   false,
+		"scoring_weights":     scoring.DefaultWeights(),
+	})
 	if err != nil {
 		return fmt.Errorf("encode ranking configuration: %w", err)
 	}
@@ -126,8 +135,15 @@ func (r *MarketData) SaveRanking(ctx context.Context, name, version string, date
 	return nil
 }
 
-func (r *MarketData) Rankings(ctx context.Context, date *time.Time, strategyName string, minimumScore *float64, sector string, affordableOnly bool, limit, offset int) ([]RankingEntry, int, error) {
-	query := `
+func (r *MarketData) Rankings(ctx context.Context, date *time.Time, strategyName string, minimumScore *float64, sector, search, sortBy string, affordableOnly bool, limit, offset int) ([]RankingEntry, int, error) {
+	orderBy := "ss.score DESC, (ss.component_scores_json->>'momentum')::double precision DESC, s.symbol ASC, s.id ASC"
+	switch sortBy {
+	case "momentum":
+		orderBy = "(ss.component_scores_json->>'momentum')::double precision DESC, ss.score DESC, s.symbol ASC, s.id ASC"
+	case "volatility":
+		orderBy = "(ss.component_scores_json->>'volatility_adjusted_momentum')::double precision DESC, ss.score DESC, s.symbol ASC, s.id ASC"
+	}
+	query := fmt.Sprintf(`
 		SELECT s.id, s.symbol, s.sector, ss.score, ss.component_scores_json
 		FROM stock_scores ss
 		JOIN stocks s ON s.id = ss.stock_id
@@ -136,10 +152,12 @@ func (r *MarketData) Rankings(ctx context.Context, date *time.Time, strategyName
 		  AND ($2 = '' OR sd.name = $2)
 		  AND ($3::double precision IS NULL OR ss.score >= $3)
 		  AND ($4 = '' OR s.sector = $4)
-		  AND (NOT $5 OR (ss.component_scores_json->>'affordable')::boolean)
-		ORDER BY ss.score DESC, (ss.component_scores_json->>'momentum')::double precision DESC, s.symbol ASC, s.id ASC
-		LIMIT $6 OFFSET $7`
-	rows, err := r.db.QueryContext(ctx, query, date, strategyName, minimumScore, sector, affordableOnly, limit, offset)
+		  AND ($5 = '' OR s.symbol ILIKE '%%' || $5 || '%%' OR s.name ILIKE '%%' || $5 || '%%')
+		  AND (NOT $6 OR (ss.component_scores_json->>'affordable')::boolean)
+		ORDER BY %s
+		LIMIT $7 OFFSET $8`, orderBy)
+	search = strings.TrimSpace(search)
+	rows, err := r.db.QueryContext(ctx, query, date, strategyName, minimumScore, sector, search, affordableOnly, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query stock rankings: %w", err)
 	}
@@ -177,8 +195,9 @@ func (r *MarketData) Rankings(ctx context.Context, date *time.Time, strategyName
 		  AND ($2 = '' OR sd.name = $2)
 		  AND ($3::double precision IS NULL OR ss.score >= $3)
 		  AND ($4 = '' OR s.sector = $4)
-		  AND (NOT $5 OR (ss.component_scores_json->>'affordable')::boolean)`,
-		date, strategyName, minimumScore, sector, affordableOnly).Scan(&total)
+		  AND ($5 = '' OR s.symbol ILIKE '%' || $5 || '%' OR s.name ILIKE '%' || $5 || '%')
+		  AND (NOT $6 OR (ss.component_scores_json->>'affordable')::boolean)`,
+		date, strategyName, minimumScore, sector, search, affordableOnly).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count stock rankings: %w", err)
 	}

@@ -1,0 +1,3 @@
+DROP INDEX universe_membership_asof_lookup_idx;
+DROP INDEX holdout_access_strategy_version_idx;
+DROP INDEX experiment_trials_strategy_version_idx;

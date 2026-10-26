@@ -21,6 +21,14 @@ func TestWalkForwardWindowsAreChronologicalAndDisjoint(t *testing.T) {
 	}
 }
 
+func TestWalkForwardWindowsRejectOverlappingTestPeriods(t *testing.T) {
+	start := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2015, 12, 31, 0, 0, 0, 0, time.UTC)
+	if _, err := WalkForwardWindows(start, end, 5, 2, 1); err == nil {
+		t.Fatal("walk-forward generator accepted overlapping test periods")
+	}
+}
+
 func TestMarketViewRejectsFuturePrices(t *testing.T) {
 	asOf := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	_, err := NewMarketView(asOf, map[string][]Price{

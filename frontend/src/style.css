@@ -38,6 +38,20 @@ a {
   border-bottom: 1px solid #e5eaf0;
 }
 
+.topbar nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-left: auto;
+  color: #475467;
+  font-size: 0.9rem;
+}
+
+.topbar nav a:hover,
+.topbar nav a.router-link-active {
+  color: #155eef;
+}
+
 .brand {
   color: #155eef;
   font-size: 1.2rem;
@@ -182,4 +196,251 @@ tbody th {
 footer {
   padding: 1.5rem;
   text-align: center;
+}
+
+.page-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.page-heading {
+  padding: 0.25rem 0;
+}
+
+.page-heading h1 {
+  margin: 0.5rem 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  letter-spacing: -0.04em;
+}
+
+.page-heading > p:last-child {
+  max-width: 720px;
+  color: #667085;
+  line-height: 1.6;
+}
+
+.card {
+  min-width: 0;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: #fff;
+  border: 1px solid #e5eaf0;
+  border-radius: 1.25rem;
+  box-shadow: 0 1.5rem 4rem #1d29391a;
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+.filters,
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.filters label,
+.form-grid label {
+  display: grid;
+  gap: 0.45rem;
+  color: #344054;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  min-height: 2.7rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.5rem;
+  background: white;
+  color: #18212f;
+  font: inherit;
+}
+
+input:focus,
+select:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #84adff;
+  outline-offset: 2px;
+}
+
+button {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.check-filter {
+  display: flex !important;
+  align-items: center;
+  gap: 0.55rem !important;
+  min-height: 2.7rem;
+}
+
+.check-filter input {
+  min-height: auto;
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  color: #667085;
+}
+
+.chart {
+  width: 100%;
+  height: 390px;
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  margin: 1.25rem 0;
+  color: #667085;
+  font-size: 0.9rem;
+}
+
+.metric-strip strong {
+  color: #18212f;
+}
+
+.volume-chart {
+  width: 100%;
+  height: 180px;
+}
+
+.form-wide {
+  grid-column: 1 / -1;
+}
+
+.form-help {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #667085;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.strategy-list,
+.job-list,
+.alert-list {
+  display: grid;
+  gap: 0.8rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strategy-list li,
+.job-list li,
+.alert-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid #e5eaf0;
+}
+
+.strategy-list span,
+.job-list span,
+.job-list time,
+.alert-list small {
+  color: #667085;
+  font-size: 0.875rem;
+}
+
+.alert-list p {
+  margin: 0.35rem 0;
+  color: #475467;
+}
+
+.alert-list li > div {
+  flex: 1;
+}
+
+.warning-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.warning {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-left: 4px solid #f79009;
+  border-radius: 0.4rem;
+  background: #fffaeb;
+  color: #7a2e0e;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.metric-grid dt {
+  color: #667085;
+  text-transform: capitalize;
+}
+
+.metric-grid dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.report-json {
+  max-height: 26rem;
+  overflow: auto;
+  padding: 1rem;
+  background: #f5f7fa;
+  border-radius: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.quick-links a,
+.section-heading > a {
+  color: #155eef;
+  font-weight: 650;
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .topbar nav {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  main {
+    width: min(100% - 1.5rem, 1100px);
+    padding: 1.5rem 0;
+  }
+
+  .chart {
+    height: 300px;
+  }
 }

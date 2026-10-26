@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"os"
@@ -12,31 +13,33 @@ import (
 )
 
 type Config struct {
-	Environment   string
-	APIHost       string
-	APIPort       int
-	DBHost        string
-	DBPort        int
-	DBName        string
-	DBUser        string
-	DBPassword    string
-	DBSSLMode     string
-	BaseCurrency  string
-	MaxCapitalCHF int
-	LogLevel      string
+	Environment         string
+	APIHost             string
+	APIPort             int
+	DBHost              string
+	DBPort              int
+	DBName              string
+	DBUser              string
+	DBPassword          string
+	DBSSLMode           string
+	BaseCurrency        string
+	MaxCapitalCHF       int
+	AlertScoreThreshold float64
+	LogLevel            string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Environment:  envOr("APP_ENV", "development"),
-		APIHost:      envOr("API_HOST", "127.0.0.1"),
-		DBHost:       envOr("DB_HOST", "localhost"),
-		DBName:       envOr("DB_NAME", "trend_radar"),
-		DBUser:       envOr("DB_USER", "trend_radar"),
-		DBPassword:   os.Getenv("DB_PASSWORD"),
-		DBSSLMode:    envOr("DB_SSLMODE", "disable"),
-		BaseCurrency: envOr("BASE_CURRENCY", "CHF"),
-		LogLevel:     strings.ToLower(envOr("LOG_LEVEL", "info")),
+		Environment:         envOr("APP_ENV", "development"),
+		APIHost:             envOr("API_HOST", "127.0.0.1"),
+		DBHost:              envOr("DB_HOST", "localhost"),
+		DBName:              envOr("DB_NAME", "trend_radar"),
+		DBUser:              envOr("DB_USER", "trend_radar"),
+		DBPassword:          os.Getenv("DB_PASSWORD"),
+		DBSSLMode:           envOr("DB_SSLMODE", "disable"),
+		BaseCurrency:        envOr("BASE_CURRENCY", "CHF"),
+		AlertScoreThreshold: 80,
+		LogLevel:            strings.ToLower(envOr("LOG_LEVEL", "info")),
 	}
 
 	var err error
@@ -48,6 +51,12 @@ func Load() (Config, error) {
 	}
 	if cfg.MaxCapitalCHF, err = intEnv("MAX_CAPITAL_CHF", domain.MaxCapitalCHF); err != nil {
 		return Config{}, err
+	}
+	if threshold, ok := os.LookupEnv("ALERT_SCORE_THRESHOLD"); ok {
+		cfg.AlertScoreThreshold, err = strconv.ParseFloat(threshold, 64)
+		if err != nil {
+			return Config{}, fmt.Errorf("ALERT_SCORE_THRESHOLD must be a number: %w", err)
+		}
 	}
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
@@ -79,6 +88,10 @@ func (c Config) validate() error {
 	}
 	if c.MaxCapitalCHF < 1 || c.MaxCapitalCHF > domain.MaxCapitalCHF {
 		return fmt.Errorf("MAX_CAPITAL_CHF must be between 1 and %d (got %d)", domain.MaxCapitalCHF, c.MaxCapitalCHF)
+	}
+	if math.IsNaN(c.AlertScoreThreshold) || math.IsInf(c.AlertScoreThreshold, 0) ||
+		c.AlertScoreThreshold < 0 || c.AlertScoreThreshold > 100 {
+		return fmt.Errorf("ALERT_SCORE_THRESHOLD must be between 0 and 100 (got %v)", c.AlertScoreThreshold)
 	}
 	switch c.LogLevel {
 	case "debug", "info", "warn", "error":

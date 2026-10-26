@@ -10,21 +10,23 @@ afterEach(() => {
 
 describe('foundation views', () => {
   it('shows rankings and the capital disclaimer', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => Promise.resolve({
       ok: true,
-      json: async () => ({
-        total: 1,
-        items: [{
-          stock_id: 'stock-1',
-          symbol: 'TEST',
-          sector: 'Technology',
-          score: 87.5,
-          rank: 1,
-          affordable: true,
-        }],
-      }),
-    }))
-    const wrapper = mount(HomeView)
+      json: async () => url.includes('/rankings')
+        ? ({
+            total: 1,
+            items: [{
+              stock_id: 'stock-1',
+              symbol: 'TEST',
+              sector: 'Technology',
+              score: 87.5,
+              rank: 1,
+              affordable: true,
+            }],
+          })
+        : ({ total: 0, items: [] }),
+    })))
+    const wrapper = mount(HomeView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('Latest rankings')
@@ -35,7 +37,7 @@ describe('foundation views', () => {
 
   it('shows an API error instead of silently hiding failed requests', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
-    const wrapper = mount(HomeView)
+    const wrapper = mount(HomeView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toContain('HTTP 503')

@@ -12,6 +12,12 @@ import { RouterLink, RouterView } from 'vue-router'
         TrendRadar
       </RouterLink>
       <span class="tagline">Market research, made transparent</span>
+      <nav aria-label="Main navigation">
+        <RouterLink to="/">Dashboard</RouterLink>
+        <RouterLink to="/stocks">Stocks</RouterLink>
+        <RouterLink to="/strategies">Strategies</RouterLink>
+        <RouterLink to="/alerts">Alerts</RouterLink>
+      </nav>
     </header>
     <main>
       <RouterView />

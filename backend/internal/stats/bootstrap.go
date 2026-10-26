@@ -21,11 +21,12 @@ type Interval struct {
 }
 
 type ConfidenceIntervals struct {
-	Sharpe       Interval `json:"sharpe"`
-	CAGR         Interval `json:"cagr"`
-	ExcessReturn Interval `json:"excess_return"`
-	Replicates   int      `json:"replicates"`
-	Seed         int64    `json:"seed"`
+	Sharpe          Interval `json:"sharpe"`
+	CAGR            Interval `json:"cagr"`
+	ExcessReturn    Interval `json:"excess_return"`
+	Replicates      int      `json:"replicates"`
+	Seed            int64    `json:"seed"`
+	ConfidenceLevel float64  `json:"confidence_level"`
 }
 
 type PerformanceSample struct {
@@ -66,7 +67,7 @@ func StationaryBootstrap(strategyReturns, benchmarkReturns []float64, config Boo
 		Sharpe:       Interval{Lower: quantile(sharpeSamples, alpha), Upper: quantile(sharpeSamples, 1-alpha)},
 		CAGR:         Interval{Lower: quantile(cagrSamples, alpha), Upper: quantile(cagrSamples, 1-alpha)},
 		ExcessReturn: Interval{Lower: quantile(excessSamples, alpha), Upper: quantile(excessSamples, 1-alpha)},
-		Replicates:   config.Replicates, Seed: config.Seed,
+		Replicates:   config.Replicates, Seed: config.Seed, ConfidenceLevel: config.ConfidenceLevel,
 	}, nil
 }
 

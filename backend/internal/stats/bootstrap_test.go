@@ -32,6 +32,7 @@ func TestDeflatedSharpeRatio(t *testing.T) {
 			returns[i] -= 0.001
 		}
 	}
+
 	singleTrial, err := DeflatedSharpeRatio(returns, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -42,5 +43,11 @@ func TestDeflatedSharpeRatio(t *testing.T) {
 	}
 	if singleTrial < 0 || singleTrial > 1 || manyTrials >= singleTrial {
 		t.Fatalf("DSR should be bounded and decrease with trials: single=%v many=%v", singleTrial, manyTrials)
+	}
+}
+
+func TestDeflatedSharpeRejectsTotalLossReturn(t *testing.T) {
+	if _, err := DeflatedSharpeRatio([]float64{0.01, -1}, 1); err == nil {
+		t.Fatal("DeflatedSharpeRatio accepted a return at or below -100%")
 	}
 }

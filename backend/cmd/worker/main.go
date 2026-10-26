@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,17 +12,20 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "time/tzdata"
 
 	"github.com/angelaschereraiza/trend_radar/backend/internal/config"
 	"github.com/angelaschereraiza/trend_radar/backend/internal/repository"
+	"github.com/angelaschereraiza/trend_radar/backend/internal/scheduler"
 	"github.com/angelaschereraiza/trend_radar/backend/internal/worker"
 )
 
 func main() {
-	if len(os.Args) != 2 || os.Args[1] != "--rankings" {
-		fmt.Fprintln(os.Stderr, "usage: go run ./cmd/worker --rankings")
+	if len(os.Args) != 2 || (os.Args[1] != "--rankings" && os.Args[1] != "--schedule") {
+		fmt.Fprintln(os.Stderr, "usage: go run ./cmd/worker --rankings | --schedule")
 		os.Exit(2)
 	}
+	mode := os.Args[1]
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("configuration error", "error", err)
@@ -35,6 +39,18 @@ func main() {
 	defer db.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if mode == "--schedule" {
+		scheduled, err := scheduler.New(db, cfg, slog.Default())
+		if err != nil {
+			slog.Error("create scheduler", "error", err)
+			os.Exit(1)
+		}
+		if err := scheduled.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("scheduler stopped", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {

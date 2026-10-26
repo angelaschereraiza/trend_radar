@@ -144,6 +144,12 @@ paths:
         - name: sector
           in: query
           schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [score, momentum, volatility] }
         - name: affordable_only
           in: query
           schema: { type: boolean }
@@ -165,6 +171,231 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /strategies:
+    get:
+      operationId: listStrategies
+      summary: List strategy definitions
+      responses:
+        "200":
+          description: Strategy definitions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyPage"
+    post:
+      operationId: createStrategy
+      summary: Create a strategy definition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyRequest"
+      responses:
+        "201":
+          description: Created strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+        "400":
+          description: Invalid strategy configuration
+  /strategies/{strategyId}:
+    get:
+      operationId: getStrategy
+      summary: Get a strategy definition
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Strategy definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+        "404":
+          description: Strategy not found
+  /backtests:
+    post:
+      operationId: createBacktest
+      summary: Queue an asynchronous backtest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BacktestRequest"
+      responses:
+        "202":
+          description: Backtest queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestRun"
+        "400":
+          description: Invalid backtest request
+  /backtests/{runId}:
+    get:
+      operationId: getBacktest
+      summary: Get backtest status and summary
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Backtest status and summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestRun"
+        "404":
+          description: Backtest not found
+  /backtests/{runId}/equity:
+    get:
+      operationId: getBacktestEquity
+      summary: Get backtest equity curve
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Equity points
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EquityPage"
+        "404":
+          description: Backtest not found
+  /backtests/{runId}/trades:
+    get:
+      operationId: getBacktestTrades
+      summary: Get simulated orders and fills
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Orders and fills
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradePage"
+        "404":
+          description: Backtest not found
+  /backtests/{runId}/metrics:
+    get:
+      operationId: getBacktestMetrics
+      summary: Get backtest performance metrics
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Performance report and warnings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestMetrics"
+        "404":
+          description: Backtest not found
+  /alerts:
+    get:
+      operationId: listAlerts
+      summary: List recent strategy alerts
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: acknowledged
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Alert page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertPage"
+  /alerts/{alertId}:
+    patch:
+      operationId: acknowledgeAlert
+      summary: Acknowledge an alert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Acknowledged alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "404":
+          description: Alert not found
+  /jobs:
+    get:
+      operationId: listJobs
+      summary: List recent scheduled jobs
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Job run page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobPage"
+  /jobs/{jobName}/run:
+    post:
+      operationId: runJob
+      summary: Queue a manual job execution
+      parameters:
+        - name: jobName
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "202":
+          description: Job queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRun"
+        "400":
+          description: Unknown job
 components:
   schemas:
     HealthResponse:
@@ -248,6 +479,155 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/RankingEntry" }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    StrategyConfig:
+      type: object
+      required: [initial_capital_chf, max_positions, rank_buffer, max_holding_months, min_trade_value_chf]
+      properties:
+        initial_capital_chf: { type: string, pattern: "^(?:[0-9]+)(?:\\.[0-9]+)?$" }
+        max_positions: { type: integer, minimum: 1, maximum: 100 }
+        rank_buffer: { type: integer, minimum: 1, maximum: 100 }
+        max_holding_months: { type: integer, minimum: 1, maximum: 60 }
+        min_trade_value_chf: { type: string, pattern: "^(?:[0-9]+)(?:\\.[0-9]+)?$" }
+        fractional_shares: { type: boolean, default: false }
+        costs:
+          $ref: "#/components/schemas/BacktestCostConfig"
+    BacktestCostConfig:
+      type: object
+      required: [commission_bps, min_commission_chf, fx_spread_bps, stamp_duty_bps, slippage_bps, withholding_rate]
+      properties:
+        commission_bps: { type: string }
+        min_commission_chf: { type: string }
+        fx_spread_bps: { type: string }
+        stamp_duty_bps: { type: string }
+        slippage_bps: { type: string }
+        withholding_rate: { type: string }
+    Strategy:
+      type: object
+      required: [id, name, version, parameters]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        version: { type: string }
+        parameters: { $ref: "#/components/schemas/StrategyConfig" }
+    StrategyPage:
+      type: object
+      required: [items, total]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Strategy" } }
+        total: { type: integer }
+    StrategyRequest:
+      type: object
+      required: [name, version, parameters]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        version: { type: string, minLength: 1, maxLength: 50 }
+        parameters: { $ref: "#/components/schemas/StrategyConfig" }
+    BacktestRequest:
+      type: object
+      required: [strategy_id, start_date, end_date, dataset_role]
+      properties:
+        strategy_id: { type: string, format: uuid }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        dataset_role: { type: string, enum: [development, walk_forward, holdout, forward] }
+        confirm_holdout: { type: boolean, default: false }
+    BacktestRun:
+      type: object
+      required: [id, strategy_id, start_date, end_date, status, dataset_role, survivorship_biased, warnings]
+      properties:
+        id: { type: string, format: uuid }
+        strategy_id: { type: string, format: uuid }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        dataset_role: { type: string }
+        snapshot_id: { type: string, format: uuid }
+        survivorship_biased: { type: boolean }
+        error: { type: string }
+        warnings: { type: array, items: { type: string } }
+        summary: { type: object, additionalProperties: true }
+    EquityPoint:
+      type: object
+      required: [date, portfolio_chf, cash_chf, invested_chf, benchmark_chf]
+      properties:
+        date: { type: string, format: date }
+        portfolio_chf: { type: string }
+        cash_chf: { type: string }
+        invested_chf: { type: string }
+        benchmark_chf: { type: string }
+    EquityPage:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/EquityPoint" } }
+    Trade:
+      type: object
+      required: [date, symbol, side, quantity, reason, status]
+      properties:
+        date: { type: string, format: date }
+        symbol: { type: string }
+        side: { type: string }
+        quantity: { type: string }
+        reason: { type: string }
+        status: { type: string }
+        reject_reason: { type: string }
+        price_usd: { type: string }
+        gross_chf: { type: string }
+        commission_chf: { type: string }
+        fx_cost_chf: { type: string }
+        stamp_duty_chf: { type: string }
+        slippage_chf: { type: string }
+    TradePage:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Trade" } }
+    BacktestMetrics:
+      type: object
+      required: [metrics, statistical_report, warnings]
+      properties:
+        metrics: { type: object, additionalProperties: true }
+        statistical_report: { type: object, additionalProperties: true }
+        warnings: { type: array, items: { type: string } }
+    Alert:
+      type: object
+      required: [id, stock_id, symbol, strategy_id, alert_type, message, created_at, acknowledged]
+      properties:
+        id: { type: string, format: uuid }
+        stock_id: { type: string, format: uuid }
+        symbol: { type: string }
+        strategy_id: { type: string, format: uuid }
+        alert_type: { type: string }
+        message: { type: string }
+        created_at: { type: string, format: date-time }
+        acknowledged: { type: boolean }
+    AlertPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Alert" } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    JobRun:
+      type: object
+      required: [id, job_name, scheduled_for, status]
+      properties:
+        id: { type: string, format: uuid }
+        job_name: { type: string }
+        scheduled_for: { type: string, format: date-time }
+        status: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        error_message: { type: string }
+    JobPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/JobRun" } }
         total: { type: integer }
         limit: { type: integer }
         offset: { type: integer }

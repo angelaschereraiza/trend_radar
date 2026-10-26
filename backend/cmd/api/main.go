@@ -49,10 +49,18 @@ func main() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(5)
+	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := api.RecoverInterruptedBacktests(recoveryCtx, db); err != nil {
+		recoveryCancel()
+		logger.Error("recover interrupted backtests", "error", err)
+		os.Exit(1)
+	}
+	recoveryCancel()
 
+	application := api.NewHandler(db)
 	server := &http.Server{
 		Addr:              net.JoinHostPort(cfg.APIHost, fmt.Sprint(cfg.APIPort)),
-		Handler:           api.NewHandler(db),
+		Handler:           application,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      35 * time.Second,
@@ -67,6 +75,9 @@ func main() {
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			logger.Error("shutdown API server", "error", err)
+		}
+		if err := application.Shutdown(shutdownCtx); err != nil {
+			logger.Error("wait for backtests to stop", "error", err)
 		}
 	}()
 

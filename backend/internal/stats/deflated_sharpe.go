@@ -10,8 +10,8 @@ func DeflatedSharpeRatio(returns []float64, trialCount int) (float64, error) {
 		return 0, errors.New("at least two returns and one trial are required")
 	}
 	for _, value := range returns {
-		if !finite(value) {
-			return 0, errors.New("returns must be finite")
+		if !finite(value) || value <= -1 {
+			return 0, errors.New("returns must be finite and greater than -100%")
 		}
 	}
 	mean := average(returns)

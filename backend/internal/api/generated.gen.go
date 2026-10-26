@@ -8,9 +8,26 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
+)
+
+// Defines values for BacktestRequestDatasetRole.
+const (
+	Development BacktestRequestDatasetRole = "development"
+	Forward     BacktestRequestDatasetRole = "forward"
+	Holdout     BacktestRequestDatasetRole = "holdout"
+	WalkForward BacktestRequestDatasetRole = "walk_forward"
+)
+
+// Defines values for BacktestRunStatus.
+const (
+	Completed BacktestRunStatus = "completed"
+	Failed    BacktestRunStatus = "failed"
+	Queued    BacktestRunStatus = "queued"
+	Running   BacktestRunStatus = "running"
 )
 
 // Defines values for HealthResponseStatus.
@@ -20,6 +37,94 @@ const (
 	Ready    HealthResponseStatus = "ready"
 )
 
+// Defines values for GetRankingsParamsSort.
+const (
+	Momentum   GetRankingsParamsSort = "momentum"
+	Score      GetRankingsParamsSort = "score"
+	Volatility GetRankingsParamsSort = "volatility"
+)
+
+// Alert defines model for Alert.
+type Alert struct {
+	Acknowledged bool               `json:"acknowledged"`
+	AlertType    string             `json:"alert_type"`
+	CreatedAt    time.Time          `json:"created_at"`
+	Id           openapi_types.UUID `json:"id"`
+	Message      string             `json:"message"`
+	StockId      openapi_types.UUID `json:"stock_id"`
+	StrategyId   openapi_types.UUID `json:"strategy_id"`
+	Symbol       string             `json:"symbol"`
+}
+
+// AlertPage defines model for AlertPage.
+type AlertPage struct {
+	Items  []Alert `json:"items"`
+	Limit  int     `json:"limit"`
+	Offset int     `json:"offset"`
+	Total  int     `json:"total"`
+}
+
+// BacktestCostConfig defines model for BacktestCostConfig.
+type BacktestCostConfig struct {
+	CommissionBps    string `json:"commission_bps"`
+	FxSpreadBps      string `json:"fx_spread_bps"`
+	MinCommissionChf string `json:"min_commission_chf"`
+	SlippageBps      string `json:"slippage_bps"`
+	StampDutyBps     string `json:"stamp_duty_bps"`
+	WithholdingRate  string `json:"withholding_rate"`
+}
+
+// BacktestMetrics defines model for BacktestMetrics.
+type BacktestMetrics struct {
+	Metrics           map[string]interface{} `json:"metrics"`
+	StatisticalReport map[string]interface{} `json:"statistical_report"`
+	Warnings          []string               `json:"warnings"`
+}
+
+// BacktestRequest defines model for BacktestRequest.
+type BacktestRequest struct {
+	ConfirmHoldout *bool                      `json:"confirm_holdout,omitempty"`
+	DatasetRole    BacktestRequestDatasetRole `json:"dataset_role"`
+	EndDate        openapi_types.Date         `json:"end_date"`
+	StartDate      openapi_types.Date         `json:"start_date"`
+	StrategyId     openapi_types.UUID         `json:"strategy_id"`
+}
+
+// BacktestRequestDatasetRole defines model for BacktestRequest.DatasetRole.
+type BacktestRequestDatasetRole string
+
+// BacktestRun defines model for BacktestRun.
+type BacktestRun struct {
+	DatasetRole        string                  `json:"dataset_role"`
+	EndDate            openapi_types.Date      `json:"end_date"`
+	Error              *string                 `json:"error,omitempty"`
+	Id                 openapi_types.UUID      `json:"id"`
+	SnapshotId         *openapi_types.UUID     `json:"snapshot_id,omitempty"`
+	StartDate          openapi_types.Date      `json:"start_date"`
+	Status             BacktestRunStatus       `json:"status"`
+	StrategyId         openapi_types.UUID      `json:"strategy_id"`
+	Summary            *map[string]interface{} `json:"summary,omitempty"`
+	SurvivorshipBiased bool                    `json:"survivorship_biased"`
+	Warnings           []string                `json:"warnings"`
+}
+
+// BacktestRunStatus defines model for BacktestRun.Status.
+type BacktestRunStatus string
+
+// EquityPage defines model for EquityPage.
+type EquityPage struct {
+	Items []EquityPoint `json:"items"`
+}
+
+// EquityPoint defines model for EquityPoint.
+type EquityPoint struct {
+	BenchmarkChf string             `json:"benchmark_chf"`
+	CashChf      string             `json:"cash_chf"`
+	Date         openapi_types.Date `json:"date"`
+	InvestedChf  string             `json:"invested_chf"`
+	PortfolioChf string             `json:"portfolio_chf"`
+}
+
 // HealthResponse defines model for HealthResponse.
 type HealthResponse struct {
 	Status HealthResponseStatus `json:"status"`
@@ -27,6 +132,25 @@ type HealthResponse struct {
 
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
+
+// JobPage defines model for JobPage.
+type JobPage struct {
+	Items  []JobRun `json:"items"`
+	Limit  int      `json:"limit"`
+	Offset int      `json:"offset"`
+	Total  int      `json:"total"`
+}
+
+// JobRun defines model for JobRun.
+type JobRun struct {
+	ErrorMessage *string            `json:"error_message,omitempty"`
+	FinishedAt   *time.Time         `json:"finished_at,omitempty"`
+	Id           openapi_types.UUID `json:"id"`
+	JobName      string             `json:"job_name"`
+	ScheduledFor time.Time          `json:"scheduled_for"`
+	StartedAt    *time.Time         `json:"started_at,omitempty"`
+	Status       string             `json:"status"`
+}
 
 // PriceBar defines model for PriceBar.
 type PriceBar struct {
@@ -93,16 +217,88 @@ type StockPage struct {
 	Total  int     `json:"total"`
 }
 
+// Strategy defines model for Strategy.
+type Strategy struct {
+	Id         openapi_types.UUID `json:"id"`
+	Name       string             `json:"name"`
+	Parameters StrategyConfig     `json:"parameters"`
+	Version    string             `json:"version"`
+}
+
+// StrategyConfig defines model for StrategyConfig.
+type StrategyConfig struct {
+	Costs             *BacktestCostConfig `json:"costs,omitempty"`
+	FractionalShares  *bool               `json:"fractional_shares,omitempty"`
+	InitialCapitalChf string              `json:"initial_capital_chf"`
+	MaxHoldingMonths  int                 `json:"max_holding_months"`
+	MaxPositions      int                 `json:"max_positions"`
+	MinTradeValueChf  string              `json:"min_trade_value_chf"`
+	RankBuffer        int                 `json:"rank_buffer"`
+}
+
+// StrategyPage defines model for StrategyPage.
+type StrategyPage struct {
+	Items []Strategy `json:"items"`
+	Total int        `json:"total"`
+}
+
+// StrategyRequest defines model for StrategyRequest.
+type StrategyRequest struct {
+	Name       string         `json:"name"`
+	Parameters StrategyConfig `json:"parameters"`
+	Version    string         `json:"version"`
+}
+
+// Trade defines model for Trade.
+type Trade struct {
+	CommissionChf *string            `json:"commission_chf,omitempty"`
+	Date          openapi_types.Date `json:"date"`
+	FxCostChf     *string            `json:"fx_cost_chf,omitempty"`
+	GrossChf      *string            `json:"gross_chf,omitempty"`
+	PriceUsd      *string            `json:"price_usd,omitempty"`
+	Quantity      string             `json:"quantity"`
+	Reason        string             `json:"reason"`
+	RejectReason  *string            `json:"reject_reason,omitempty"`
+	Side          string             `json:"side"`
+	SlippageChf   *string            `json:"slippage_chf,omitempty"`
+	StampDutyChf  *string            `json:"stamp_duty_chf,omitempty"`
+	Status        string             `json:"status"`
+	Symbol        string             `json:"symbol"`
+}
+
+// TradePage defines model for TradePage.
+type TradePage struct {
+	Items []Trade `json:"items"`
+}
+
+// ListAlertsParams defines parameters for ListAlerts.
+type ListAlertsParams struct {
+	Limit        *int  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset       *int  `form:"offset,omitempty" json:"offset,omitempty"`
+	Acknowledged *bool `form:"acknowledged,omitempty" json:"acknowledged,omitempty"`
+}
+
+// ListJobsParams defines parameters for ListJobs.
+type ListJobsParams struct {
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // GetRankingsParams defines parameters for GetRankings.
 type GetRankingsParams struct {
-	Strategy       *string             `form:"strategy,omitempty" json:"strategy,omitempty"`
-	Date           *openapi_types.Date `form:"date,omitempty" json:"date,omitempty"`
-	Limit          *int                `form:"limit,omitempty" json:"limit,omitempty"`
-	MinimumScore   *float32            `form:"minimum_score,omitempty" json:"minimum_score,omitempty"`
-	Sector         *string             `form:"sector,omitempty" json:"sector,omitempty"`
-	AffordableOnly *bool               `form:"affordable_only,omitempty" json:"affordable_only,omitempty"`
-	Offset         *int                `form:"offset,omitempty" json:"offset,omitempty"`
+	Strategy       *string                `form:"strategy,omitempty" json:"strategy,omitempty"`
+	Date           *openapi_types.Date    `form:"date,omitempty" json:"date,omitempty"`
+	Limit          *int                   `form:"limit,omitempty" json:"limit,omitempty"`
+	MinimumScore   *float32               `form:"minimum_score,omitempty" json:"minimum_score,omitempty"`
+	Sector         *string                `form:"sector,omitempty" json:"sector,omitempty"`
+	Search         *string                `form:"search,omitempty" json:"search,omitempty"`
+	Sort           *GetRankingsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	AffordableOnly *bool                  `form:"affordable_only,omitempty" json:"affordable_only,omitempty"`
+	Offset         *int                   `form:"offset,omitempty" json:"offset,omitempty"`
 }
+
+// GetRankingsParamsSort defines parameters for GetRankings.
+type GetRankingsParamsSort string
 
 // GetStocksParams defines parameters for GetStocks.
 type GetStocksParams struct {
@@ -120,14 +316,47 @@ type GetStockPricesParams struct {
 	Offset *int                `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// CreateBacktestJSONRequestBody defines body for CreateBacktest for application/json ContentType.
+type CreateBacktestJSONRequestBody = BacktestRequest
+
+// CreateStrategyJSONRequestBody defines body for CreateStrategy for application/json ContentType.
+type CreateStrategyJSONRequestBody = StrategyRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List recent strategy alerts
+	// (GET /alerts)
+	ListAlerts(w http.ResponseWriter, r *http.Request, params ListAlertsParams)
+	// Acknowledge an alert
+	// (PATCH /alerts/{alertId})
+	AcknowledgeAlert(w http.ResponseWriter, r *http.Request, alertId openapi_types.UUID)
+	// Queue an asynchronous backtest
+	// (POST /backtests)
+	CreateBacktest(w http.ResponseWriter, r *http.Request)
+	// Get backtest status and summary
+	// (GET /backtests/{runId})
+	GetBacktest(w http.ResponseWriter, r *http.Request, runId openapi_types.UUID)
+	// Get backtest equity curve
+	// (GET /backtests/{runId}/equity)
+	GetBacktestEquity(w http.ResponseWriter, r *http.Request, runId openapi_types.UUID)
+	// Get backtest performance metrics
+	// (GET /backtests/{runId}/metrics)
+	GetBacktestMetrics(w http.ResponseWriter, r *http.Request, runId openapi_types.UUID)
+	// Get simulated orders and fills
+	// (GET /backtests/{runId}/trades)
+	GetBacktestTrades(w http.ResponseWriter, r *http.Request, runId openapi_types.UUID)
 	// Check whether the API process is alive
 	// (GET /health/live)
 	GetHealthLive(w http.ResponseWriter, r *http.Request)
 	// Check whether required dependencies are available
 	// (GET /health/ready)
 	GetHealthReady(w http.ResponseWriter, r *http.Request)
+	// List recent scheduled jobs
+	// (GET /jobs)
+	ListJobs(w http.ResponseWriter, r *http.Request, params ListJobsParams)
+	// Queue a manual job execution
+	// (POST /jobs/{jobName}/run)
+	RunJob(w http.ResponseWriter, r *http.Request, jobName string)
 	// Get reproducible cross-sectional stock rankings
 	// (GET /rankings)
 	GetRankings(w http.ResponseWriter, r *http.Request, params GetRankingsParams)
@@ -140,6 +369,15 @@ type ServerInterface interface {
 	// List daily stock price bars
 	// (GET /stocks/{stockId}/prices)
 	GetStockPrices(w http.ResponseWriter, r *http.Request, stockId openapi_types.UUID, params GetStockPricesParams)
+	// List strategy definitions
+	// (GET /strategies)
+	ListStrategies(w http.ResponseWriter, r *http.Request)
+	// Create a strategy definition
+	// (POST /strategies)
+	CreateStrategy(w http.ResponseWriter, r *http.Request)
+	// Get a strategy definition
+	// (GET /strategies/{strategyId})
+	GetStrategy(w http.ResponseWriter, r *http.Request, strategyId openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -150,6 +388,188 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAlerts operation middleware
+func (siw *ServerInterfaceWrapper) ListAlerts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAlertsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "acknowledged" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "acknowledged", r.URL.Query(), &params.Acknowledged)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "acknowledged", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAlerts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcknowledgeAlert operation middleware
+func (siw *ServerInterfaceWrapper) AcknowledgeAlert(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "alertId" -------------
+	var alertId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "alertId", r.PathValue("alertId"), &alertId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "alertId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcknowledgeAlert(w, r, alertId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBacktest operation middleware
+func (siw *ServerInterfaceWrapper) CreateBacktest(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBacktest(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBacktest operation middleware
+func (siw *ServerInterfaceWrapper) GetBacktest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "runId" -------------
+	var runId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", r.PathValue("runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBacktest(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBacktestEquity operation middleware
+func (siw *ServerInterfaceWrapper) GetBacktestEquity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "runId" -------------
+	var runId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", r.PathValue("runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBacktestEquity(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBacktestMetrics operation middleware
+func (siw *ServerInterfaceWrapper) GetBacktestMetrics(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "runId" -------------
+	var runId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", r.PathValue("runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBacktestMetrics(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBacktestTrades operation middleware
+func (siw *ServerInterfaceWrapper) GetBacktestTrades(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "runId" -------------
+	var runId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", r.PathValue("runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBacktestTrades(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealthLive operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthLive(w http.ResponseWriter, r *http.Request) {
@@ -170,6 +590,66 @@ func (siw *ServerInterfaceWrapper) GetHealthReady(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthReady(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListJobs operation middleware
+func (siw *ServerInterfaceWrapper) ListJobs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListJobsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListJobs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RunJob operation middleware
+func (siw *ServerInterfaceWrapper) RunJob(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "jobName" -------------
+	var jobName string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "jobName", r.PathValue("jobName"), &jobName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jobName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunJob(w, r, jobName)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -224,6 +704,22 @@ func (siw *ServerInterfaceWrapper) GetRankings(w http.ResponseWriter, r *http.Re
 	err = runtime.BindQueryParameter("form", true, false, "sector", r.URL.Query(), &params.Sector)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sector", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "search" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "search", r.URL.Query(), &params.Search)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
 		return
 	}
 
@@ -390,6 +886,59 @@ func (siw *ServerInterfaceWrapper) GetStockPrices(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListStrategies operation middleware
+func (siw *ServerInterfaceWrapper) ListStrategies(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListStrategies(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateStrategy operation middleware
+func (siw *ServerInterfaceWrapper) CreateStrategy(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateStrategy(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetStrategy operation middleware
+func (siw *ServerInterfaceWrapper) GetStrategy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "strategyId" -------------
+	var strategyId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "strategyId", r.PathValue("strategyId"), &strategyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "strategyId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStrategy(w, r, strategyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -510,12 +1059,24 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/alerts", wrapper.ListAlerts)
+	m.HandleFunc("PATCH "+options.BaseURL+"/alerts/{alertId}", wrapper.AcknowledgeAlert)
+	m.HandleFunc("POST "+options.BaseURL+"/backtests", wrapper.CreateBacktest)
+	m.HandleFunc("GET "+options.BaseURL+"/backtests/{runId}", wrapper.GetBacktest)
+	m.HandleFunc("GET "+options.BaseURL+"/backtests/{runId}/equity", wrapper.GetBacktestEquity)
+	m.HandleFunc("GET "+options.BaseURL+"/backtests/{runId}/metrics", wrapper.GetBacktestMetrics)
+	m.HandleFunc("GET "+options.BaseURL+"/backtests/{runId}/trades", wrapper.GetBacktestTrades)
 	m.HandleFunc("GET "+options.BaseURL+"/health/live", wrapper.GetHealthLive)
 	m.HandleFunc("GET "+options.BaseURL+"/health/ready", wrapper.GetHealthReady)
+	m.HandleFunc("GET "+options.BaseURL+"/jobs", wrapper.ListJobs)
+	m.HandleFunc("POST "+options.BaseURL+"/jobs/{jobName}/run", wrapper.RunJob)
 	m.HandleFunc("GET "+options.BaseURL+"/rankings", wrapper.GetRankings)
 	m.HandleFunc("GET "+options.BaseURL+"/stocks", wrapper.GetStocks)
 	m.HandleFunc("GET "+options.BaseURL+"/stocks/{stockId}", wrapper.GetStock)
 	m.HandleFunc("GET "+options.BaseURL+"/stocks/{stockId}/prices", wrapper.GetStockPrices)
+	m.HandleFunc("GET "+options.BaseURL+"/strategies", wrapper.ListStrategies)
+	m.HandleFunc("POST "+options.BaseURL+"/strategies", wrapper.CreateStrategy)
+	m.HandleFunc("GET "+options.BaseURL+"/strategies/{strategyId}", wrapper.GetStrategy)
 
 	return m
 }
