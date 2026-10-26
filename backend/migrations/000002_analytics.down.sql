@@ -1,0 +1,14 @@
+DROP TABLE alerts;
+DROP TABLE job_runs;
+DROP TABLE holdout_access_log;
+DROP TABLE experiment_trials;
+DROP TABLE backtest_equity;
+DROP TABLE backtest_positions;
+DROP TABLE backtest_cash_ledger;
+DROP TABLE backtest_fills;
+DROP TABLE backtest_orders;
+DROP TABLE backtest_runs;
+DROP TABLE factor_correlations;
+DROP TABLE stock_scores;
+DROP TABLE strategy_definitions;
+DROP TABLE indicators;

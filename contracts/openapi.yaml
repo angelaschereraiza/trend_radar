@@ -1,0 +1,253 @@
+openapi: 3.1.0
+info:
+  title: TrendRadar API
+  version: 0.1.0
+  description: Research API for market data analysis. Not investment advice.
+servers:
+  - url: /api/v1
+paths:
+  /health/live:
+    get:
+      operationId: getHealthLive
+      summary: Check whether the API process is alive
+      responses:
+        "200":
+          description: The process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /health/ready:
+    get:
+      operationId: getHealthReady
+      summary: Check whether required dependencies are available
+      responses:
+        "200":
+          description: The API is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /stocks:
+    get:
+      operationId: getStocks
+      summary: List stocks
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sector
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A page of stocks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockPage"
+        "400":
+          description: Invalid pagination parameters
+  /stocks/{stockId}:
+    get:
+      operationId: getStock
+      summary: Get stock details
+      parameters:
+        - name: stockId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Stock details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stock"
+        "404":
+          description: Stock not found
+  /stocks/{stockId}/prices:
+    get:
+      operationId: getStockPrices
+      summary: List daily stock price bars
+      parameters:
+        - name: stockId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: A page of price bars
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricePage"
+        "400":
+          description: Invalid query or stock identifier
+        "404":
+          description: Stock not found
+  /rankings:
+    get:
+      operationId: getRankings
+      summary: Get reproducible cross-sectional stock rankings
+      parameters:
+        - name: strategy
+          in: query
+          schema: { type: string }
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200 }
+        - name: minimum_score
+          in: query
+          schema: { type: number, minimum: 0, maximum: 100 }
+        - name: sector
+          in: query
+          schema: { type: string }
+        - name: affordable_only
+          in: query
+          schema: { type: boolean }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: A page of ranked stocks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankingPage"
+        "400":
+          description: Invalid query parameters
+        "503":
+          description: A required dependency is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - live
+            - ready
+            - not_ready
+    Stock:
+      type: object
+      required: [id, symbol, exchange, name, currency, sector, industry, active]
+      properties:
+        id: { type: string, format: uuid }
+        symbol: { type: string }
+        exchange: { type: string }
+        name: { type: string }
+        currency: { type: string }
+        sector: { type: string }
+        industry: { type: string }
+        active: { type: boolean }
+    StockPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Stock" }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    PriceBar:
+      type: object
+      required: [date, open, high, low, close, adjusted_close, volume, currency]
+      properties:
+        date: { type: string, format: date }
+        open: { type: string }
+        high: { type: string }
+        low: { type: string }
+        close: { type: string }
+        adjusted_close: { type: string }
+        volume: { type: integer, format: int64 }
+        currency: { type: string }
+    PricePage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PriceBar" }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    RankingEntry:
+      type: object
+      required: [stock_id, symbol, sector, score, rank, components, affordable]
+      properties:
+        stock_id: { type: string, format: uuid }
+        symbol: { type: string }
+        sector: { type: string }
+        score: { type: number }
+        rank: { type: integer }
+        components:
+          type: object
+          required: [momentum, relative_strength, trend_quality, relative_volume, volatility_adjusted_momentum]
+          properties:
+            momentum: { type: number }
+            relative_strength: { type: number }
+            trend_quality: { type: number }
+            relative_volume: { type: number }
+            volatility_adjusted_momentum: { type: number }
+        affordable: { type: boolean }
+    RankingPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/RankingEntry" }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }

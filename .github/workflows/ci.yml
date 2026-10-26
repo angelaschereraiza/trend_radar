@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Verify formatting
+        run: test -z "$(gofmt -l backend)"
+      - name: Verify generated OpenAPI code
+        run: |
+          cd backend
+          go tool oapi-codegen --config ../contracts/oapi-codegen.yaml ../contracts/openapi.yaml
+          git diff --exit-code -- internal/api/generated.gen.go
+      - name: Test
+        working-directory: backend
+        run: go test ./...
+      - name: Race detection
+        working-directory: backend
+        run: go test -race ./...
+      - name: Vet
+        working-directory: backend
+        run: go vet ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+      - run: npm run typecheck
+        working-directory: frontend
+      - run: npm run test
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
