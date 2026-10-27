@@ -4,7 +4,7 @@ SHELL := /bin/bash
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: dev db-up db-down generate test lint build migrate-up migrate-down fixture-import import-yahoo
+.PHONY: dev db-up db-down generate test lint build migrate-up migrate-down fixture-import import-yahoo import-eodhd-exchanges import-eodhd-catalog import-eodhd-history
 
 dev:
 	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
@@ -39,6 +39,26 @@ import-yahoo:
 fixture-import:
 	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
 	@set -a; . ./.env; set +a; cd $(BACKEND_DIR); go run ./cmd/collector --fixture
+
+import-eodhd-exchanges:
+	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
+	@set -a; . ./.env; set +a; cd $(BACKEND_DIR); go run ./cmd/collector --eodhd-exchanges
+
+import-eodhd-catalog:
+	@if [ -z "$(EXCHANGE)" ]; then echo "Usage: make import-eodhd-catalog EXCHANGE=SW"; exit 2; fi
+	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
+	@set -a; . ./.env; set +a; cd $(BACKEND_DIR); go run ./cmd/collector --eodhd-catalog "$(EXCHANGE)"
+
+import-eodhd-history:
+	@if [ -z "$(EXCHANGE)" ] || [ -z "$(SYMBOL)" ]; then echo "Usage: make import-eodhd-history EXCHANGE=SW SYMBOL=NOVN [FROM=YYYY-MM-DD TO=YYYY-MM-DD]"; exit 2; fi
+	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
+	@set -a; . ./.env; set +a; cd $(BACKEND_DIR); \
+	if [ -n "$(FROM)" ] || [ -n "$(TO)" ]; then \
+		if [ -z "$(FROM)" ] || [ -z "$(TO)" ]; then echo "Specify both FROM and TO"; exit 2; fi; \
+		go run ./cmd/collector --eodhd-history "$(EXCHANGE)" "$(SYMBOL)" "$(FROM)" "$(TO)"; \
+	else \
+		go run ./cmd/collector --eodhd-history "$(EXCHANGE)" "$(SYMBOL)"; \
+	fi
 
 db-up:
 	podman compose up -d postgres

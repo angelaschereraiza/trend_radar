@@ -4,13 +4,14 @@ import { RouterLink } from 'vue-router'
 import { api, type Page, type Ranking, type Stock } from '../api'
 
 const page = ref<Page<Ranking>>({ items: [], total: 0, limit: 50, offset: 0 })
-const stocks = ref<Stock[]>([])
+const catalogPage = ref<Page<Stock>>({ items: [], total: 0, limit: 50, offset: 0 })
 const search = ref('')
 const sector = ref('')
 const affordableOnly = ref(false)
 const sortBy = ref<'score' | 'momentum' | 'volatility'>('score')
 const offset = ref(0)
 const loading = ref(true)
+const catalogLoading = ref(false)
 const error = ref('')
 const catalogError = ref('')
 const hasFilters = computed(() => Boolean(search.value.trim() || sector.value || affordableOnly.value))
@@ -25,11 +26,6 @@ const visible = computed(() => page.value.items
     const key = sortBy.value === 'momentum' ? 'momentum' : 'volatility_adjusted_momentum'
     return (b.components[key] ?? 0) - (a.components[key] ?? 0) || a.symbol.localeCompare(b.symbol)
   }))
-const catalogMatches = computed(() => stocks.value
-  .filter(item => item.symbol.toLowerCase().includes(search.value.trim().toLowerCase())
-    || item.name.toLowerCase().includes(search.value.trim().toLowerCase()))
-  .filter(item => !sector.value || item.sector === sector.value))
-
 async function load() {
   loading.value = true
   error.value = ''
@@ -47,11 +43,17 @@ async function load() {
 }
 
 async function loadCatalog() {
+  catalogLoading.value = true
+  catalogError.value = ''
   try {
-    const stockPage = await api<Page<Stock>>('/stocks?limit=200')
-    stocks.value = stockPage.items
+    const query = new URLSearchParams({ limit: '50', offset: String(catalogPage.value.offset) })
+    if (search.value.trim()) query.set('search', search.value.trim())
+    if (sector.value) query.set('sector', sector.value)
+    catalogPage.value = await api<Page<Stock>>(`/stocks?${query}`)
   } catch (cause) {
     catalogError.value = cause instanceof Error ? cause.message : 'Instrument catalog could not be loaded.'
+  } finally {
+    catalogLoading.value = false
   }
 }
 
@@ -60,7 +62,19 @@ function clearFilters() {
   sector.value = ''
   affordableOnly.value = false
   offset.value = 0
-  load()
+  catalogPage.value.offset = 0
+  Promise.all([load(), loadCatalog()])
+}
+
+function searchAll() {
+  offset.value = 0
+  catalogPage.value.offset = 0
+  Promise.all([load(), loadCatalog()])
+}
+
+function changeCatalogPage(direction: -1 | 1) {
+  catalogPage.value.offset = Math.max(0, catalogPage.value.offset + direction * catalogPage.value.limit)
+  loadCatalog()
 }
 
 onMounted(() => Promise.all([load(), loadCatalog()]))
@@ -81,14 +95,14 @@ onMounted(() => Promise.all([load(), loadCatalog()]))
           <input
             v-model="search"
             type="search"
-            placeholder="e.g. Aiza"
-            @keyup.enter="offset = 0; load()"
+            placeholder="e.g. Novartis"
+            @keyup.enter="searchAll"
           >
         </label>
         <label class="stock-sector">Sector
           <select
             v-model="sector"
-            @change="offset = 0; load()"
+            @change="searchAll"
           >
             <option value="">All sectors</option>
             <option
@@ -119,7 +133,7 @@ onMounted(() => Promise.all([load(), loadCatalog()]))
         <button
           class="stock-search-button"
           type="button"
-          @click="offset = 0; load()"
+          @click="searchAll"
         >
           Search
         </button>
@@ -200,10 +214,7 @@ onMounted(() => Promise.all([load(), loadCatalog()]))
         </button>
       </div>
     </section>
-    <section
-      v-if="catalogMatches.length > 0"
-      class="card"
-    >
+    <section class="card">
       <div class="section-heading">
         <div>
           <p class="eyebrow">
@@ -211,14 +222,37 @@ onMounted(() => Promise.all([load(), loadCatalog()]))
           </p>
           <h2>Available instruments</h2>
         </div>
-        <span class="result-count">{{ catalogMatches.length }} instruments</span>
+        <span class="result-count">{{ catalogPage.total }} instruments</span>
       </div>
-      <div class="table-scroll">
+      <p
+        v-if="catalogLoading"
+        role="status"
+        class="message"
+      >
+        Loading instrument catalog…
+      </p>
+      <p
+        v-else-if="catalogError"
+        role="alert"
+        class="message error"
+      >
+        Instrument catalog could not be loaded: {{ catalogError }}
+      </p>
+      <p
+        v-else-if="catalogPage.total === 0"
+        class="message"
+      >
+        No instruments imported yet. Load an exchange catalog with <code>make import-eodhd-catalog EXCHANGE=SW</code>.
+      </p>
+      <div
+        v-else
+        class="table-scroll"
+      >
         <table>
           <thead><tr><th>Symbol</th><th>Company / instrument</th><th>Exchange</th><th>Currency</th><th>Price history</th></tr></thead>
           <tbody>
             <tr
-              v-for="item in catalogMatches"
+              v-for="item in catalogPage.items"
               :key="item.id"
             >
               <th scope="row">
@@ -232,13 +266,24 @@ onMounted(() => Promise.all([load(), loadCatalog()]))
           </tbody>
         </table>
       </div>
+      <div
+        v-if="catalogPage.total > catalogPage.limit"
+        class="pagination"
+      >
+        <button
+          :disabled="catalogLoading || catalogPage.offset === 0"
+          @click="changeCatalogPage(-1)"
+        >
+          Previous instruments
+        </button>
+        <span>{{ catalogPage.offset + 1 }}–{{ Math.min(catalogPage.offset + catalogPage.items.length, catalogPage.total) }} of {{ catalogPage.total }}</span>
+        <button
+          :disabled="catalogLoading || catalogPage.offset + catalogPage.limit >= catalogPage.total"
+          @click="changeCatalogPage(1)"
+        >
+          More instruments
+        </button>
+      </div>
     </section>
-    <p
-      v-else-if="catalogError"
-      role="alert"
-      class="message error"
-    >
-      Instrument catalog could not be loaded: {{ catalogError }}
-    </p>
   </section>
 </template>

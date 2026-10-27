@@ -15,6 +15,8 @@ func TestYahooProviderFetchBatch(t *testing.T) {
 	secondDate := firstDate.AddDate(0, 0, 1)
 	charts := map[string]string{
 		"NESN.SW":  yahooTestChart("CHF", "Europe/Zurich", firstDate, secondDate, true),
+		"NOVN.SW":  yahooTestChart("CHF", "Europe/Zurich", firstDate, secondDate, false),
+		"ROG.SW":   yahooTestChart("CHF", "Europe/Zurich", firstDate, secondDate, false),
 		"SPY":      yahooTestChart("USD", "America/New_York", firstDate, secondDate, false),
 		"USDCHF=X": yahooTestChart("CHF", "Europe/London", firstDate, secondDate, false),
 	}
@@ -41,7 +43,7 @@ func TestYahooProviderFetchBatch(t *testing.T) {
 	if err := ValidateBatch(batch); err != nil {
 		t.Fatalf("provider returned invalid batch: %v", err)
 	}
-	if len(batch.Symbols) != 2 || len(batch.Prices) != 4 || len(batch.FXRates) != 2 {
+	if len(batch.Symbols) != 4 || len(batch.Prices) != 8 || len(batch.FXRates) != 2 {
 		t.Fatalf("unexpected batch counts: symbols=%d prices=%d fx=%d",
 			len(batch.Symbols), len(batch.Prices), len(batch.FXRates))
 	}

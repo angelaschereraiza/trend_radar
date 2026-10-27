@@ -3,7 +3,7 @@
 ## Components and responsibilities
 
 - `backend/cmd/api` starts the HTTP API and wires configuration, PostgreSQL, and request handlers.
-- `backend/cmd/collector` imports either explicit local fixtures or daily bars from the Yahoo Finance chart endpoint for NESN, SPY and USD/CHF.
+- `backend/cmd/collector` imports explicit local fixtures, Yahoo Finance daily bars for the configured ticker list, or EODHD exchange catalogs and selected-symbol daily bars.
 - `backend/cmd/migrate` applies or rolls back the embedded PostgreSQL migrations.
 - `backend/cmd/worker` runs persisted jobs, either on demand or on the market schedule.
 - `backend/internal/api` contains HTTP mapping and orchestration. The generated handler types are derived from `contracts/openapi.yaml`; do not edit `generated.gen.go` by hand.
@@ -21,7 +21,7 @@
 5. A backtest request pins a data snapshot, universe, strategy configuration, and dataset role. The runner simulates the request, persists the result, and exposes status, equity, trades, and metrics.
 6. Scheduled and manual jobs share the persisted `job_runs` queue. Leases allow interrupted work to be recovered without relying on process-local locks.
 
-The market-data provider and FX provider contracts are defined in `backend/internal/marketdata/types.go`. Yahoo Finance is currently used only by the explicit collector import command; it is an unofficial endpoint, not a licensed or guaranteed production provider. CHF-denominated securities are excluded from the current USD-only ranking and backtest queries.
+The market-data provider and FX provider contracts are defined in `backend/internal/marketdata/types.go`. Yahoo Finance is used only by the explicit collector command and does not provide a complete ticker catalog in this integration. EODHD catalog and selected-history imports use a local API token and are subject to free-plan quotas. CHF-denominated securities are excluded from the current USD-only ranking and backtest queries.
 
 ## Persistence
 

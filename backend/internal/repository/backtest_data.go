@@ -256,10 +256,17 @@ func (r *MarketData) loadDailyFX(ctx context.Context, start, end time.Time) (map
 
 func (r *MarketData) loadCorporateActions(ctx context.Context, start, end time.Time) (map[string][]backtest.CorporateAction, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT s.symbol, ca.action_type, ca.delisting_reason, ca.amount, ca.ratio, ca.effective_date
-		FROM corporate_actions ca JOIN stocks s ON s.id = ca.stock_id
-		WHERE ca.effective_date >= $1 AND ca.effective_date <= $2
-		ORDER BY ca.effective_date, ca.id`, start, end)
+		SELECT symbol, action_type, delisting_reason, amount, ratio, effective_date
+		FROM (
+			SELECT DISTINCT ON (ca.stock_id, ca.action_type, ca.effective_date)
+			       s.symbol, ca.action_type, ca.delisting_reason, ca.amount, ca.ratio,
+			       ca.effective_date, ca.imported_at, ca.id
+			FROM corporate_actions ca
+			JOIN stocks s ON s.id = ca.stock_id
+			WHERE ca.effective_date >= $1 AND ca.effective_date <= $2
+			ORDER BY ca.stock_id, ca.action_type, ca.effective_date, ca.imported_at DESC, ca.id DESC
+		) latest
+		ORDER BY effective_date, id`, start, end)
 	if err != nil {
 		return nil, fmt.Errorf("query backtest corporate actions: %w", err)
 	}

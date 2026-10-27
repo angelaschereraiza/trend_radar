@@ -24,6 +24,6 @@ Walk-forward evaluation keeps each training fold earlier than its test fold, rej
 
 Backtest runs retain the selected snapshot, universe, strategy/configuration, dataset role, code version, trial count, and warnings. Snapshot content hashes provide an identity for canonicalized imported data; they do not prove the source data is complete or unbiased.
 
-The current manual Yahoo Finance import is an unofficial source and its small current-symbol universe is survivorship-biased; it is not a licensed production feed or point-in-time delisted-security dataset. The default cost and tax assumptions are unverified. These gaps prevent interpreting imported-data results as evidence of real-world profitability. CHF-denominated stocks such as Nestlé are deliberately excluded from the USD-only ranking and backtest calculations.
+The manual Yahoo Finance import is an unofficial source, while the EODHD free import has limited API calls and history depth; neither supplies a complete point-in-time delisted-security dataset. Both imported universes are survivorship-biased. The default cost and tax assumptions are unverified. These gaps prevent interpreting imported-data results as evidence of real-world profitability. CHF-denominated stocks such as Nestlé, Novartis and Roche are deliberately excluded from the USD-only ranking and backtest calculations.
 
 For execution details, test references, and the API workflow, see [backtesting assumptions](./backtesting-assumptions.md). The simulator is not connected to a brokerage and cannot place orders.

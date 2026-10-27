@@ -41,24 +41,22 @@ func (r *MarketData) Import(ctx context.Context, batch marketdata.ImportBatch, d
 	}
 	defer tx.Rollback()
 
+	symbolIDs := make(map[string]string, len(batch.Symbols))
 	for _, symbol := range batch.Symbols {
-		if _, err := tx.ExecContext(ctx, `
+		var stockID string
+		err := tx.QueryRowContext(ctx, `
 			INSERT INTO stocks (id, symbol, exchange, name, currency, sector, industry)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (id) DO UPDATE SET
-				symbol = EXCLUDED.symbol, exchange = EXCLUDED.exchange,
+			ON CONFLICT (exchange, symbol) DO UPDATE SET
 				name = EXCLUDED.name, currency = EXCLUDED.currency,
 				sector = EXCLUDED.sector, industry = EXCLUDED.industry,
 				updated_at = now()`,
 			symbol.ID, symbol.Symbol, symbol.Exchange, symbol.Name, symbol.Currency, symbol.Sector, symbol.Industry,
-		); err != nil {
+		).Scan(&stockID)
+		if err != nil {
 			return ImportReport{}, fmt.Errorf("upsert stock %s: %w", symbol.Symbol, err)
 		}
-	}
-
-	symbolIDs := make(map[string]string, len(batch.Symbols))
-	for _, symbol := range batch.Symbols {
-		symbolIDs[symbol.Symbol] = symbol.ID
+		symbolIDs[symbol.Symbol] = stockID
 		firstDate := time.Time{}
 		for _, bar := range batch.Prices {
 			if bar.Symbol == symbol.Symbol && (firstDate.IsZero() || bar.TradingDate.Before(firstDate)) {
@@ -70,13 +68,13 @@ func (r *MarketData) Import(ctx context.Context, batch marketdata.ImportBatch, d
 		}
 		var recordedID string
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO symbol_history (stock_id, symbol, valid_from)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (symbol) WHERE valid_to IS NULL
+			INSERT INTO symbol_history (stock_id, symbol, exchange, valid_from)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (exchange, symbol) WHERE valid_to IS NULL
 			DO UPDATE SET valid_from = LEAST(symbol_history.valid_from, EXCLUDED.valid_from)
 			WHERE symbol_history.stock_id = EXCLUDED.stock_id
 			RETURNING stock_id`,
-			symbol.ID, symbol.Symbol, firstDate,
+			stockID, symbol.Symbol, symbol.Exchange, firstDate,
 		).Scan(&recordedID)
 		if err == sql.ErrNoRows {
 			return ImportReport{}, fmt.Errorf("symbol %s is already assigned to another security; close the prior symbol history first", symbol.Symbol)
@@ -176,7 +174,7 @@ func (r *MarketData) Import(ctx context.Context, batch marketdata.ImportBatch, d
 					(universe_id, stock_id, valid_from, valid_to, source)
 				VALUES ($1, $2, $3, $4, 'import_snapshot')
 				ON CONFLICT (universe_id, stock_id, valid_from) DO NOTHING`,
-				universeID, symbol.ID, snapshot.RangeStart, snapshot.RangeEnd)
+				universeID, symbolIDs[symbol.Symbol], snapshot.RangeStart, snapshot.RangeEnd)
 			if err != nil {
 				return ImportReport{}, fmt.Errorf("persist imported universe membership for %s: %w", symbol.Symbol, err)
 			}

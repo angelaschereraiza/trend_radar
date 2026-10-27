@@ -25,13 +25,23 @@ The project is being implemented in the order defined by [the specification](doc
 
    To start or stop only PostgreSQL, use `make db-up` or `make db-down`.
 
-4. In a second terminal, import real daily data for Nestlé, SPY and USD/CHF:
+4. In a second terminal, import real daily data for Nestlé, Novartis, Roche, SPY and USD/CHF:
 
    ```sh
    make import-yahoo
    ```
 
-   This downloads up to ten years of daily history using Yahoo Finance's public chart endpoint, then stores an explicitly survivorship-biased snapshot. The endpoint is unofficial, may change or be rate-limited, and its terms/licensing suitability are not guaranteed. Use it only for local/private research under the provider's applicable terms. The instrument catalog lets you open Nestlé's CHF price history even though CHF securities are excluded from the current USD-only rankings and backtests. With only SPY as a USD symbol, the current import does not provide a broad investable universe for meaningful rankings.
+   This downloads up to ten years of daily history for the configured Yahoo ticker list, then stores an explicitly survivorship-biased snapshot. The endpoint is unofficial, may change or be rate-limited, and its terms/licensing suitability are not guaranteed. Use it only for local/private research under the provider's applicable terms. The current list includes Nestlé, Novartis, Roche and SPY. CHF securities are displayed in CHF but excluded from the current USD-only rankings and backtests.
+
+5. To browse broader global stock catalogs, get an EODHD API key, add it as `EODHD_API_TOKEN` in `.env`, then list supported exchange codes and import catalogs one exchange at a time:
+
+   ```sh
+   make import-eodhd-exchanges
+   make import-eodhd-catalog EXCHANGE=SW
+   make import-eodhd-history EXCHANGE=SW SYMBOL=NOVN
+   ```
+
+   `SW` is the EODHD code for the SIX Swiss Exchange. History imports default to the latest year; optionally set `FROM=YYYY-MM-DD TO=YYYY-MM-DD`. The EODHD free plan currently allows 20 API calls per day and only the past year of EOD data. A history import uses four API calls (catalog, daily prices, dividends and splits), so the free quota is not suitable for importing prices for every global listing. Catalog exchanges must be imported incrementally. See [data source coverage and limits](docs/data-sources.md).
 
 The API listens on `127.0.0.1:8080` by default. The frontend runs on `127.0.0.1:5173` and proxies `/api` to the API server.
 
@@ -44,7 +54,7 @@ Health endpoints:
 
 See `.env.example` for the supported local environment values. `MAX_CAPITAL_CHF` defaults to the compiled ceiling of CHF 5,000 and may be lowered; values above CHF 5,000 are rejected at startup. API binding is restricted to loopback addresses.
 
-The Yahoo Finance import currently needs no credentials. It is an unofficial source and should only be used for local/private research subject to Yahoo's applicable terms. The normal `make dev` startup does not import data. To load synthetic development data explicitly, use `make fixture-import`; do not treat fixture-derived results as real market data.
+The Yahoo Finance import currently needs no credentials. It is an unofficial source and should only be used for local/private research subject to Yahoo's applicable terms. EODHD requires a personal API token configured locally in `EODHD_API_TOKEN`; never commit it or share it in chat. The normal `make dev` startup does not import data. To load synthetic development data explicitly, use `make fixture-import`; do not treat fixture-derived results as real market data.
 
 ## Development commands
 
@@ -75,7 +85,7 @@ Frontend commands can be run from `frontend`: `npm run dev`, `npm run test`, `np
 - `backend/internal/calendar`: NYSE holiday, trading-day and early-close helpers for 1990–2035.
 - `backend/internal/indicators`: pure Go technical indicator functions.
 - `backend/internal/scoring`: winsorized cross-sectional percentile ranking.
-- `backend/internal/marketdata`: price validation, fixtures, the Yahoo Finance chart adapter, provider contracts and snapshot hashing.
+- `backend/internal/marketdata`: price validation, fixtures, Yahoo Finance and EODHD adapters, provider contracts and snapshot hashing.
 - `backend/internal/repository`: PostgreSQL market-data imports and stock reads.
 - `backend/internal/backtest`, `backend/internal/metrics`, and `backend/internal/validation`: decimal-ledger simulation, costs/corporate actions, baseline strategies, and statistical performance reporting.
 - `backend/internal/scheduler`: persisted job queue, crash-recoverable leases, daily market-calendar scheduling, ranking, alert, and data-quality jobs.
@@ -87,7 +97,7 @@ Frontend commands can be run from `frontend`: `npm run dev`, `npm run test`, `np
 
 ## Current limitations
 
-The Yahoo Finance chart adapter provides daily prices for Nestlé (`NESN.SW`) and SPY, plus USD/CHF rates; this is an unofficial endpoint, not a licensed production feed. Delisted-security coverage, broker costs, fractional-share policy, and a CHF risk-free series remain open decisions. Imported universes and all resulting reports remain marked survivorship-biased. The current ranking and backtest calculations use USD-denominated instruments only; Nestlé is visible in the instrument catalog and its chart is denominated in CHF. The REST API can create strategies, queue and retrieve historical backtests, expose equity/trades/statistics, acknowledge alerts, and report job status. The frontend includes the dashboard, stock explorer and details, strategy/backtest workflow, and alerts. Start `cmd/worker --schedule` to process persisted jobs. See [backtesting assumptions and integration boundaries](docs/backtesting-assumptions.md).
+Yahoo Finance supplies daily prices for the configured ticker list; EODHD supplies exchange catalogs and on-demand end-of-day history. Both sources have limitations: Yahoo's chart endpoint is unofficial, while the EODHD free plan is capped at 20 calls/day and one year of EOD history. Neither provides a complete point-in-time historical universe in this setup. Imported market universes and resulting reports remain marked survivorship-biased. The current ranking and backtest calculations use USD-denominated instruments only; Swiss equities are visible in the catalog and their charts are denominated in CHF. The REST API can create strategies, queue and retrieve historical backtests, expose equity/trades/statistics, acknowledge alerts, and report job status. The frontend includes the dashboard, stock explorer and details, strategy/backtest workflow, and alerts. Start `cmd/worker --schedule` to process persisted jobs. See [backtesting assumptions and integration boundaries](docs/backtesting-assumptions.md).
 
 Additional reference documentation: [architecture](docs/architecture.md), [strategy and scoring](docs/strategy.md), [backtesting and validation](docs/backtesting.md), [data sources](docs/data-sources.md), and [Swiss investor assumptions](docs/swiss-investor-notes.md).
 

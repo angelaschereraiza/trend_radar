@@ -27,7 +27,7 @@ Dataset split and walk-forward helpers prevent overlapping training and test win
 
 ## Integration boundary
 
-The research workflow is wired to the REST backtest endpoints. The manual Yahoo Finance chart import is unofficial and has no point-in-time delisted-security coverage; all snapshots it creates remain marked survivorship-biased. Its current import includes Nestlé (CHF) and SPY (USD), so Nestlé is excluded from USD-only backtest calculations. Provider and broker assumptions are not inferred by this implementation.
+The research workflow is wired to the REST backtest endpoints. The manual Yahoo Finance chart import is unofficial, and the EODHD free-tier import has limited history and API calls; neither has point-in-time delisted-security coverage. All snapshots remain marked survivorship-biased. The Yahoo import includes Nestlé, Novartis and Roche (CHF), which are excluded from USD-only backtest calculations. Provider and broker assumptions are not inferred by this implementation.
 
 ## API, jobs, and frontend workflow
 

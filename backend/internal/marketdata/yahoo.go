@@ -48,9 +48,33 @@ var yahooInstruments = []yahooInstrument{
 	},
 	{
 		symbol: Symbol{
+			ID:       uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://finance.yahoo.com/quote/NOVN.SW")).String(),
+			Symbol:   "NOVN",
+			Exchange: "SIX",
+			Name:     "Novartis AG",
+			Currency: "CHF",
+			Sector:   "Health Care",
+			Industry: "Pharmaceuticals",
+		},
+		ticker: "NOVN.SW", currency: "CHF",
+	},
+	{
+		symbol: Symbol{
+			ID:       uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://finance.yahoo.com/quote/ROG.SW")).String(),
+			Symbol:   "ROG",
+			Exchange: "SIX",
+			Name:     "Roche Holding AG",
+			Currency: "CHF",
+			Sector:   "Health Care",
+			Industry: "Pharmaceuticals",
+		},
+		ticker: "ROG.SW", currency: "CHF",
+	},
+	{
+		symbol: Symbol{
 			ID:       uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://finance.yahoo.com/quote/SPY")).String(),
 			Symbol:   "SPY",
-			Exchange: "NYSE",
+			Exchange: "NYSE Arca",
 			Name:     "SPDR S&P 500 ETF Trust",
 			Currency: "USD",
 			Sector:   "Benchmark",
@@ -260,7 +284,7 @@ func (r yahooChartResult) priceBars(instrument yahooInstrument, from, to time.Ti
 		if err != nil {
 			return nil, nil, err
 		}
-		version, err := yahooBarVersion(date, open, high, low, closePrice, adjustedClose, *quote.Volume[i])
+		version, err := marketDataVersion(date, open, high, low, closePrice, adjustedClose, *quote.Volume[i])
 		if err != nil {
 			return nil, nil, fmt.Errorf("version Yahoo Finance bar for %s: %w", instrument.ticker, err)
 		}
@@ -348,7 +372,7 @@ func (r yahooChartResult) fxRates(from, to time.Time, marketDates map[string]str
 		}
 		key := date.Format("2006-01-02")
 		observed[key] = struct{}{}
-		version, err := yahooBarVersion(date, rate)
+		version, err := marketDataVersion(date, rate)
 		if err != nil {
 			return nil, fmt.Errorf("version Yahoo Finance USD/CHF rate: %w", err)
 		}
@@ -388,7 +412,7 @@ func yahooDecimal(value float64) (decimal.Decimal, error) {
 	return result, nil
 }
 
-func yahooBarVersion(date time.Time, values ...any) (string, error) {
+func marketDataVersion(date time.Time, values ...any) (string, error) {
 	payload, err := json.Marshal(struct {
 		Date   string `json:"date"`
 		Values []any  `json:"values"`

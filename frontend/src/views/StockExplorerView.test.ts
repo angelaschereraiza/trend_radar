@@ -91,6 +91,6 @@ describe('StockExplorerView', () => {
     await wrapper.get('button.secondary-button').trigger('click')
     await flushPromises()
     expect(wrapper.get('tbody').text()).toContain('MSFT')
-    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
   })
 })
