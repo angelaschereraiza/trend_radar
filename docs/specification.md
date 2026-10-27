@@ -108,7 +108,7 @@ For backtests, the engine loads the required price, FX and universe data for the
 
 ### Infrastructure
 
-- Docker Compose and Podman-compatible containers.
+- Podman Compose.
 - Environment-based configuration.
 - Health checks.
 - Persistent database storage.

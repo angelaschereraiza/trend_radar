@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
@@ -64,7 +64,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="page-grid">
+  <section class="page-grid backtest-page">
     <p
       v-if="error"
       role="alert"
@@ -80,27 +80,78 @@ onUnmounted(() => {
       Loading backtest…
     </p>
     <template v-else>
-      <header class="page-heading">
-        <p class="eyebrow">
-          Backtest · {{ run.dataset_role }}
-        </p>
-        <h1>Research results</h1>
-        <p>{{ run.start_date }} through {{ run.end_date }} · Status: <strong>{{ run.status }}</strong></p>
-        <p
-          v-if="run.status === 'queued' || run.status === 'running'"
-          role="status"
-          class="message"
+      <header class="page-heading backtest-heading">
+        <div>
+          <p class="eyebrow">
+            Backtest · {{ run.dataset_role }}
+          </p>
+          <h1>Research results</h1>
+          <p class="backtest-period">
+            {{ run.start_date }} through {{ run.end_date }}
+          </p>
+        </div>
+        <span
+          class="status-badge"
+          :class="`status-${run.status}`"
         >
-          Execution is in progress. This page refreshes automatically.
-        </p>
-        <p
-          v-if="run.error"
-          role="alert"
-          class="message error"
-        >
-          {{ run.error }}
-        </p>
+          {{ run.status }}
+        </span>
       </header>
+
+      <section
+        v-if="run.status === 'failed'"
+        class="backtest-status-card backtest-failed"
+        role="status"
+      >
+        <span
+          class="status-icon"
+          aria-hidden="true"
+        >!</span>
+        <div class="backtest-status-content">
+          <h2>Backtest could not be completed</h2>
+          <p>{{ run.error || 'The run stopped before results were generated.' }}</p>
+          <p class="backtest-next-step">
+            Check the API logs for the failure details. Confirm that the selected dates are covered by imported prices, benchmark data, FX rates, and the chosen data snapshot.
+          </p>
+          <nav
+            class="backtest-actions"
+            aria-label="Next steps"
+          >
+            <RouterLink
+              class="primary-link"
+              to="/strategies"
+            >
+              Review strategy setup
+            </RouterLink>
+            <RouterLink
+              class="secondary-link"
+              to="/stocks"
+            >
+              Open stock explorer
+            </RouterLink>
+          </nav>
+        </div>
+      </section>
+      <section
+        v-else-if="run.status === 'queued' || run.status === 'running'"
+        class="backtest-status-card backtest-pending"
+        role="status"
+      >
+        <span
+          class="status-icon"
+          aria-hidden="true"
+        >…</span>
+        <div class="backtest-status-content">
+          <h2>{{ run.status === 'queued' ? 'Backtest queued' : 'Backtest in progress' }}</h2>
+          <p>Execution is underway. This page checks for updates automatically.</p>
+        </div>
+      </section>
+      <div
+        v-if="run.status === 'completed'"
+        class="backtest-complete-summary"
+      >
+        <p>Research run completed for <strong>{{ run.start_date }} – {{ run.end_date }}</strong>.</p>
+      </div>
 
       <section
         class="warning-list"

@@ -84,8 +84,10 @@ func fixtureBatch() ImportBatch {
 		{ID: "00000000-0000-4000-8000-000000000004", Symbol: "SPY", Exchange: "NYSE", Name: "Fixture Benchmark", Currency: "USD", Sector: "Benchmark"},
 	}
 	batch := ImportBatch{Symbols: symbols}
-	start := time.Date(2023, time.January, 3, 0, 0, 0, 0, time.UTC)
+	start := time.Date(2022, time.January, 3, 0, 0, 0, 0, time.UTC)
+	dataStart := time.Date(2023, time.January, 3, 0, 0, 0, 0, time.UTC)
 	sessions := 0
+	preHistorySessions := 0
 	for calendarDays := 0; sessions < 300; calendarDays++ {
 		date := start.AddDate(0, 0, calendarDays)
 		open, err := calendar.IsTradingDay(calendar.FromTime(date))
@@ -96,11 +98,18 @@ func fixtureBatch() ImportBatch {
 			continue
 		}
 		for i, symbol := range symbols {
-			closeValue := decimal.Zero
+			baseClose := decimal.NewFromInt(int64(100 + i*30))
 			if symbol.Symbol == "SPY" {
-				closeValue = decimal.NewFromInt(400).Add(decimal.NewFromInt(int64(sessions)).Div(decimal.NewFromInt(2)))
+				baseClose = decimal.NewFromInt(400)
+			}
+			closeValue := baseClose
+			if date.Before(dataStart) {
+				progress := decimal.NewFromInt(int64(252 + preHistorySessions)).Div(decimal.NewFromInt(504))
+				closeValue = baseClose.Mul(progress)
+			} else if symbol.Symbol == "SPY" {
+				closeValue = baseClose.Add(decimal.NewFromInt(int64(sessions)).Div(decimal.NewFromInt(2)))
 			} else {
-				closeValue = decimal.NewFromInt(int64(100 + i*30 + sessions*(i+1)))
+				closeValue = baseClose.Add(decimal.NewFromInt(int64(sessions * (i + 1))))
 			}
 			bar := PriceBar{
 				Symbol: symbol.Symbol, TradingDate: date,
@@ -109,15 +118,19 @@ func fixtureBatch() ImportBatch {
 				Low:   closeValue.Sub(decimal.NewFromInt(2)),
 				Close: closeValue, AdjustedClose: closeValue,
 				Volume: 1_000_000 + int64(i*1000), Currency: "USD",
-				Provider: "fixture", DataVersion: "fixture-v2",
+				Provider: "fixture", DataVersion: "fixture-v4",
 			}
 			batch.Prices = append(batch.Prices, bar)
 		}
 		batch.FXRates = append(batch.FXRates, FXRate{
 			BaseCurrency: "USD", QuoteCurrency: "CHF", RateDate: date,
-			Rate: decimal.RequireFromString("0.88"), Provider: "fixture", DataVersion: "fixture-v2",
+			Rate: decimal.RequireFromString("0.88"), Provider: "fixture", DataVersion: "fixture-v4",
 		})
-		sessions++
+		if date.Before(dataStart) {
+			preHistorySessions++
+		} else {
+			sessions++
+		}
 	}
 	return batch
 }

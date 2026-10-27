@@ -18,8 +18,8 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 || os.Args[1] != "--fixture" {
-		fmt.Fprintln(os.Stderr, "usage: go run ./cmd/collector --fixture")
+	if len(os.Args) != 2 || (os.Args[1] != "--fixture" && os.Args[1] != "--yahoo") {
+		fmt.Fprintln(os.Stderr, "usage: go run ./cmd/collector --fixture | --yahoo")
 		os.Exit(2)
 	}
 	cfg, err := config.Load()
@@ -35,19 +35,33 @@ func main() {
 	defer db.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		slog.Error("connect to database", "error", err)
 		os.Exit(1)
 	}
-	batch := marketdata.NewFixtureProvider().Batch()
-	report, err := repository.NewMarketData(db).Import(ctx, batch, "Deterministic local fixture dataset", true)
+	var batch marketdata.ImportBatch
+	description := "Deterministic local fixture dataset"
+	if os.Args[1] == "--yahoo" {
+		to := time.Now().UTC()
+		from := to.AddDate(-10, 0, 0)
+		batch, err = marketdata.NewYahooProvider().FetchBatch(ctx, from, to)
+		description = "Yahoo Finance daily history for NESN, SPY and USD/CHF; limited current universe"
+	} else {
+		batch = marketdata.NewFixtureProvider().Batch()
+	}
 	if err != nil {
-		slog.Error("import fixture data", "error", err)
+		slog.Error("fetch market data", "provider", os.Args[1], "error", err)
 		os.Exit(1)
 	}
-	slog.Info("fixture data imported",
+	report, err := repository.NewMarketData(db).Import(ctx, batch, description, true)
+	if err != nil {
+		slog.Error("import market data", "provider", os.Args[1], "error", err)
+		os.Exit(1)
+	}
+	slog.Info("market data imported",
+		"provider", os.Args[1],
 		"snapshot_id", report.SnapshotID,
 		"inserted_rows", report.Inserted,
 		"unchanged_rows", report.Unchanged,

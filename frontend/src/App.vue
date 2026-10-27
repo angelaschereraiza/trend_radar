@@ -11,7 +11,6 @@ import { RouterLink, RouterView } from 'vue-router'
       >
         TrendRadar
       </RouterLink>
-      <span class="tagline">Market research, made transparent</span>
       <nav aria-label="Main navigation">
         <RouterLink to="/">Dashboard</RouterLink>
         <RouterLink to="/stocks">Stocks</RouterLink>
@@ -19,9 +18,9 @@ import { RouterLink, RouterView } from 'vue-router'
         <RouterLink to="/alerts">Alerts</RouterLink>
       </nav>
     </header>
-    <main>
+    <main id="main-content">
       <RouterView />
     </main>
-    <footer>Research tool only — not investment advice. Capital limit: CHF 5,000.</footer>
+    <footer>@2026 Aiza GmbH</footer>
   </div>
 </template>

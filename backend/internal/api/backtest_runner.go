@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -44,7 +45,11 @@ func (h *HealthHandler) executeBacktest(ctx context.Context, runID uuid.UUID, re
 	runErr := h.runBacktest(ctx, runID, request)
 	if runErr != nil {
 		slog.ErrorContext(ctx, "backtest execution failed", "run_id", runID, "error", runErr)
-		if err := h.setBacktestStatus(context.WithoutCancel(ctx), runID, "failed", "backtest failed; consult server logs for details"); err != nil {
+		message := "backtest failed; consult server logs for details"
+		if errors.Is(runErr, repository.ErrInsufficientBacktestHistory) {
+			message = "insufficient historical data before the first signal; import at least 253 aligned market sessions before the selected start date and submit a new run"
+		}
+		if err := h.setBacktestStatus(context.WithoutCancel(ctx), runID, "failed", message); err != nil {
 			slog.ErrorContext(ctx, "persist backtest failure failed", "run_id", runID, "error", err)
 		}
 	}

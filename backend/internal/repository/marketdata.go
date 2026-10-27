@@ -157,28 +157,28 @@ func (r *MarketData) Import(ctx context.Context, batch marketdata.ImportBatch, d
 		universeID := uuid.New()
 		definition, err := json.Marshal(map[string]string{
 			"source_snapshot_id": snapshotID.String(),
-			"membership_quality": "fixture_survivorship_biased",
+			"membership_quality": "limited_current_universe_survivorship_biased",
 		})
 		if err != nil {
-			return ImportReport{}, fmt.Errorf("encode fixture universe definition: %w", err)
+			return ImportReport{}, fmt.Errorf("encode imported universe definition: %w", err)
 		}
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO universes (id, name, version, definition_json)
-			VALUES ($1, 'fixture_universe', $2, $3::jsonb)
+			VALUES ($1, 'imported_universe', $2, $3::jsonb)
 			ON CONFLICT (name, version) DO UPDATE SET definition_json = EXCLUDED.definition_json
 			RETURNING id`, universeID, universeVersion, definition).Scan(&universeID)
 		if err != nil {
-			return ImportReport{}, fmt.Errorf("persist fixture universe: %w", err)
+			return ImportReport{}, fmt.Errorf("persist imported universe: %w", err)
 		}
 		for _, symbol := range batch.Symbols {
 			_, err := tx.ExecContext(ctx, `
 				INSERT INTO market_universe_memberships
 					(universe_id, stock_id, valid_from, valid_to, source)
-				VALUES ($1, $2, $3, $4, 'fixture_snapshot')
+				VALUES ($1, $2, $3, $4, 'import_snapshot')
 				ON CONFLICT (universe_id, stock_id, valid_from) DO NOTHING`,
 				universeID, symbol.ID, snapshot.RangeStart, snapshot.RangeEnd)
 			if err != nil {
-				return ImportReport{}, fmt.Errorf("persist fixture membership for %s: %w", symbol.Symbol, err)
+				return ImportReport{}, fmt.Errorf("persist imported universe membership for %s: %w", symbol.Symbol, err)
 			}
 		}
 	}

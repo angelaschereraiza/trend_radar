@@ -32,7 +32,7 @@ const priceOption = computed(() => ({
   tooltip: { trigger: 'axis' },
   grid: { left: 55, right: 20, top: 25, bottom: 35 },
   xAxis: { type: 'category', data: dates.value, axisLabel: { hideOverlap: true } },
-  yAxis: { type: 'value', scale: true, name: 'USD' },
+  yAxis: { type: 'value', scale: true, name: stock.value?.currency ?? '' },
   dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18 }],
   series: [
     { type: 'line', name: 'Adjusted close', data: prices.value, showSymbol: false, smooth: false },
@@ -46,7 +46,7 @@ const volumeOption = computed(() => ({
   grid: { left: 55, right: 20, top: 15, bottom: 30 },
   xAxis: { type: 'category', data: dates.value, axisLabel: { show: false } },
   yAxis: { type: 'value', name: 'Volume' },
-  series: [{ type: 'bar', name: 'Volume', data: volumes.value, itemStyle: { color: '#91b4ef' } }],
+  series: [{ type: 'bar', name: 'Volume', data: volumes.value, itemStyle: { color: '#6aa8ff' } }],
 }))
 
 onMounted(async () => {
@@ -57,7 +57,13 @@ onMounted(async () => {
       api<Page<PriceBar>>(`/stocks/${id}/prices?limit=2000`),
     ])
     stock.value = stockResult
-    bars.value = priceResult.items.slice().reverse()
+    const priceItems = [...priceResult.items]
+    for (let nextOffset = priceItems.length; nextOffset < priceResult.total; nextOffset += priceResult.limit) {
+      const nextPage = await api<Page<PriceBar>>(`/stocks/${id}/prices?limit=${priceResult.limit}&offset=${nextOffset}`)
+      if (nextPage.items.length === 0) break
+      priceItems.push(...nextPage.items)
+    }
+    bars.value = priceItems.reverse()
     const rankingPage = await api<{ items: Ranking[] }>(`/rankings?search=${encodeURIComponent(stockResult.symbol)}&limit=200`)
     ranking.value = rankingPage.items.find(item => item.stock_id === stockResult.id) ?? null
   } catch (cause) {

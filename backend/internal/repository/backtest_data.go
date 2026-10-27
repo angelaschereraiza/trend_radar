@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/angelaschereraiza/trend_radar/backend/internal/scoring"
 	"github.com/angelaschereraiza/trend_radar/backend/internal/strategy"
 )
+
+var ErrInsufficientBacktestHistory = errors.New("insufficient backtest history")
 
 type historicalBar struct {
 	stockID  string
@@ -37,6 +40,7 @@ func (r *MarketData) LoadBacktestDays(ctx context.Context, start, end time.Time)
 			FROM stock_prices p
 			JOIN stocks s ON s.id = p.stock_id
 			WHERE p.trading_date >= $1 AND p.trading_date <= $2
+			  AND s.currency = 'USD' AND p.currency = 'USD'
 			ORDER BY p.stock_id, p.trading_date, p.imported_at DESC, p.data_version DESC
 		) latest
 		ORDER BY trading_date, symbol`, lookbackStart, end)
@@ -157,7 +161,8 @@ func historicalRankings(series map[string][]historicalBar, benchmarkByDate map[s
 		return benchmarkObservations[i].Date.Before(benchmarkObservations[j].Date)
 	})
 	if len(benchmarkObservations) < 253 {
-		return nil, fmt.Errorf("benchmark has fewer than 253 aligned observations by %s", asOf.Format("2006-01-02"))
+		return nil, fmt.Errorf("%w: benchmark has fewer than 253 aligned observations by %s",
+			ErrInsufficientBacktestHistory, asOf.Format("2006-01-02"))
 	}
 	inputs := make([]scoring.StockInput, 0, len(series)-1)
 	factorsBySymbol := make(map[string]scoring.Factors)

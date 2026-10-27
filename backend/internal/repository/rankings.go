@@ -47,7 +47,7 @@ func (r *MarketData) LoadLatestPriceHistory(ctx context.Context) ([]PriceHistory
 				p.trading_date, p.close, p.adjusted_close, p.volume, p.imported_at, p.data_version
 			FROM stock_prices p
 			JOIN stocks s ON s.id = p.stock_id
-			WHERE s.active
+			WHERE s.active AND s.currency = 'USD' AND p.currency = 'USD'
 			ORDER BY p.stock_id, p.trading_date, p.imported_at DESC, p.data_version DESC
 		) latest
 		ORDER BY symbol ASC, trading_date ASC`)

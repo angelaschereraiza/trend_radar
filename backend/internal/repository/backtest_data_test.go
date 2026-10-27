@@ -1,12 +1,66 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/shopspring/decimal"
+
+	"github.com/angelaschereraiza/trend_radar/backend/internal/marketdata"
 )
+
+func TestFixtureSupportsDefaultBacktestFirstSignal(t *testing.T) {
+	batch := marketdata.NewFixtureProvider().Batch()
+	stockIDs := make(map[string]string, len(batch.Symbols))
+	for _, symbol := range batch.Symbols {
+		stockIDs[symbol.Symbol] = symbol.ID
+	}
+	asOf := time.Date(2023, time.November, 30, 0, 0, 0, 0, time.UTC)
+	series := make(map[string][]historicalBar)
+	benchmarkByDate := make(map[string]historicalBar)
+	for _, price := range batch.Prices {
+		if price.TradingDate.After(asOf) {
+			continue
+		}
+		bar := historicalBar{
+			stockID: stockIDs[price.Symbol], symbol: price.Symbol,
+			date: price.TradingDate, close: price.Close, adjusted: price.AdjustedClose,
+			volume: price.Volume, currency: price.Currency,
+		}
+		series[price.Symbol] = append(series[price.Symbol], bar)
+		if price.Symbol == "SPY" {
+			benchmarkByDate[price.TradingDate.Format("2006-01-02")] = bar
+		}
+	}
+
+	candidates, err := historicalRankings(series, benchmarkByDate, asOf)
+	if err != nil {
+		t.Fatalf("historicalRankings() for default first signal: %v", err)
+	}
+	if len(candidates) != 3 {
+		t.Fatalf("eligible fixture candidates = %d, want 3", len(candidates))
+	}
+}
+
+func TestHistoricalRankingsIdentifiesInsufficientBenchmarkHistory(t *testing.T) {
+	start := time.Date(2023, time.January, 3, 0, 0, 0, 0, time.UTC)
+	benchmarkByDate := make(map[string]historicalBar, 252)
+	for i := 0; i < 252; i++ {
+		date := start.AddDate(0, 0, i)
+		bar := historicalBar{
+			symbol: "SPY", date: date,
+			adjusted: decimal.NewFromInt(400), volume: 1_000_000,
+		}
+		benchmarkByDate[date.Format("2006-01-02")] = bar
+	}
+
+	_, err := historicalRankings(nil, benchmarkByDate, start.AddDate(0, 0, 251))
+	if !errors.Is(err, ErrInsufficientBacktestHistory) {
+		t.Fatalf("historicalRankings() error = %v, want insufficient-history error", err)
+	}
+}
 
 func TestHistoricalRankingsUseOnlyObservationsAsOfDecisionDate(t *testing.T) {
 	start := time.Date(2022, time.January, 3, 0, 0, 0, 0, time.UTC)

@@ -27,7 +27,7 @@ Dataset split and walk-forward helpers prevent overlapping training and test win
 
 ## Integration boundary
 
-The research workflow is wired to the REST backtest endpoints. The current project has no selected production market-data/FX provider or point-in-time delisted-security dataset. Any run based on the existing fixture data must remain marked survivorship-biased; provider and broker assumptions are not inferred by this implementation.
+The research workflow is wired to the REST backtest endpoints. The manual Yahoo Finance chart import is unofficial and has no point-in-time delisted-security coverage; all snapshots it creates remain marked survivorship-biased. Its current import includes Nestlé (CHF) and SPY (USD), so Nestlé is excluded from USD-only backtest calculations. Provider and broker assumptions are not inferred by this implementation.
 
 ## API, jobs, and frontend workflow
 

@@ -138,109 +138,124 @@ onMounted(loadStrategies)
     <section class="card">
       <h2>New strategy and backtest</h2>
       <form
-        class="form-grid"
+        class="form-grid strategy-form"
         @submit.prevent="createAndRun"
       >
-        <label>Strategy name<input
-          v-model.trim="form.name"
-          required
-          maxlength="100"
-        ></label>
-        <label>Version<input
-          v-model.trim="form.version"
-          required
-          maxlength="50"
-        ></label>
-        <label>Initial capital (CHF)<input
-          v-model="form.initialCapital"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>Maximum positions<input
-          v-model.number="form.maxPositions"
-          type="number"
-          min="1"
-          max="100"
-          required
-        ></label>
-        <label>Rank buffer<input
-          v-model.number="form.rankBuffer"
-          type="number"
-          min="1"
-          max="100"
-          required
-        ></label>
-        <label>Maximum holding months<input
-          v-model.number="form.maxHoldingMonths"
-          type="number"
-          min="1"
-          max="60"
-          required
-        ></label>
-        <label>Minimum trade value (CHF)<input
-          v-model="form.minTradeValue"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>Commission (basis points)<input
-          v-model="form.commissionBps"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>Minimum commission (CHF)<input
-          v-model="form.minCommission"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>FX spread (basis points)<input
-          v-model="form.fxSpreadBps"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>Stamp duty (basis points)<input
-          v-model="form.stampDutyBps"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>Slippage (basis points)<input
-          v-model="form.slippageBps"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>Dividend withholding rate<input
-          v-model="form.withholdingRate"
-          inputmode="decimal"
-          required
-        ></label>
-        <label>Dataset role
-          <select v-model="form.role">
-            <option value="development">Development</option>
-            <option value="walk_forward">Walk-forward</option>
-            <option value="holdout">Holdout</option>
-            <option value="forward">Forward</option>
-          </select>
-        </label>
-        <label>Start date<input
-          v-model="form.startDate"
-          type="date"
-          required
-        ></label>
-        <label>End date<input
-          v-model="form.endDate"
-          type="date"
-          required
-        ></label>
-        <label class="check-filter"><input
-          v-model="form.fractionalShares"
-          type="checkbox"
-        > Allow fractional shares</label>
-        <label
-          v-if="form.role === 'holdout'"
-          class="check-filter"
-        ><input
-          v-model="form.confirmHoldout"
-          type="checkbox"
-        > I confirm this holdout access</label>
+        <fieldset class="form-section form-wide">
+          <legend>Portfolio rules</legend>
+          <div class="strategy-fields strategy-fields-portfolio">
+            <label>Strategy name<input
+              v-model.trim="form.name"
+              required
+              maxlength="100"
+            ></label>
+            <label>Version<input
+              v-model.trim="form.version"
+              required
+              maxlength="50"
+            ></label>
+            <label>Initial capital (CHF)<input
+              v-model="form.initialCapital"
+              inputmode="decimal"
+              required
+            ></label>
+            <label>Maximum positions<input
+              v-model.number="form.maxPositions"
+              type="number"
+              min="1"
+              max="100"
+              required
+            ></label>
+            <label>Rank buffer<input
+              v-model.number="form.rankBuffer"
+              type="number"
+              min="1"
+              max="100"
+              required
+            ></label>
+            <label>Maximum holding months<input
+              v-model.number="form.maxHoldingMonths"
+              type="number"
+              min="1"
+              max="60"
+              required
+            ></label>
+            <label>Minimum trade value (CHF)<input
+              v-model="form.minTradeValue"
+              inputmode="decimal"
+              required
+            ></label>
+            <label class="check-filter"><input
+              v-model="form.fractionalShares"
+              type="checkbox"
+            > Allow fractional shares</label>
+          </div>
+        </fieldset>
+        <fieldset class="form-section form-wide">
+          <legend>Trading costs</legend>
+          <div class="strategy-fields strategy-fields-costs">
+            <label>Commission (basis points)<input
+              v-model="form.commissionBps"
+              inputmode="decimal"
+              required
+            ></label>
+            <label>Minimum commission (CHF)<input
+              v-model="form.minCommission"
+              inputmode="decimal"
+              required
+            ></label>
+            <label>FX spread (basis points)<input
+              v-model="form.fxSpreadBps"
+              inputmode="decimal"
+              required
+            ></label>
+            <label>Stamp duty (basis points)<input
+              v-model="form.stampDutyBps"
+              inputmode="decimal"
+              required
+            ></label>
+            <label>Slippage (basis points)<input
+              v-model="form.slippageBps"
+              inputmode="decimal"
+              required
+            ></label>
+            <label>Dividend withholding rate<input
+              v-model="form.withholdingRate"
+              inputmode="decimal"
+              required
+            ></label>
+          </div>
+        </fieldset>
+        <fieldset class="form-section form-wide">
+          <legend>Research period</legend>
+          <div class="strategy-fields strategy-fields-period">
+            <label>Dataset role
+              <select v-model="form.role">
+                <option value="development">Development</option>
+                <option value="walk_forward">Walk-forward</option>
+                <option value="holdout">Holdout</option>
+                <option value="forward">Forward</option>
+              </select>
+            </label>
+            <label>Start date<input
+              v-model="form.startDate"
+              type="date"
+              required
+            ></label>
+            <label>End date<input
+              v-model="form.endDate"
+              type="date"
+              required
+            ></label>
+            <label
+              v-if="form.role === 'holdout'"
+              class="check-filter"
+            ><input
+              v-model="form.confirmHoldout"
+              type="checkbox"
+            > I confirm this holdout access</label>
+          </div>
+        </fieldset>
         <p class="form-help">
           Costs are per-side research assumptions in basis points, except minimum commission and withholding rate. The strategy is saved before the run is queued. Existing versions cannot be overwritten. Capital above CHF 5,000 is rejected.
         </p>
@@ -259,7 +274,7 @@ onMounted(loadStrategies)
           {{ resultMessage }}
         </p>
         <button
-          class="form-wide"
+          class="form-wide primary-button"
           type="submit"
           :disabled="submitting"
         >

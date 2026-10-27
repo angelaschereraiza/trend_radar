@@ -27,6 +27,32 @@ func TestFixtureProviderDeterministicAndValid(t *testing.T) {
 	}
 }
 
+func TestFixtureProvidesBacktestWarmupWithoutChangingExistingPriceSeries(t *testing.T) {
+	batch := NewFixtureProvider().Batch()
+	dataStart := time.Date(2023, time.January, 3, 0, 0, 0, 0, time.UTC)
+	firstSignalDate := time.Date(2023, time.December, 1, 0, 0, 0, 0, time.UTC)
+	benchmarkHistory := 0
+	var firstFixturePrice *PriceBar
+	for i := range batch.Prices {
+		bar := &batch.Prices[i]
+		if bar.Symbol != "SPY" {
+			continue
+		}
+		if bar.TradingDate.Before(firstSignalDate) {
+			benchmarkHistory++
+		}
+		if bar.TradingDate.Equal(dataStart) {
+			firstFixturePrice = bar
+		}
+	}
+	if benchmarkHistory < 253 {
+		t.Fatalf("benchmark warmup has %d sessions before the first signal, want at least 253", benchmarkHistory)
+	}
+	if firstFixturePrice == nil || !firstFixturePrice.Close.Equal(decimal.NewFromInt(400)) {
+		t.Fatalf("first original SPY close = %v, want 400", firstFixturePrice)
+	}
+}
+
 func TestSnapshotOrderingDoesNotMutateInput(t *testing.T) {
 	batch := NewFixtureProvider().Batch()
 	originalFirst := batch.Prices[0]

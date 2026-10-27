@@ -125,9 +125,9 @@ func (s *Scheduler) RunOne(ctx context.Context) error {
 func (s *Scheduler) execute(ctx context.Context, name string) error {
 	switch name {
 	case "market_data":
-		return errors.New("market data provider is not configured; use the local fixture importer for development")
+		return errors.New("scheduled market-data collection is not configured; run cmd/collector --yahoo to import the supported Yahoo Finance instruments")
 	case "fx_rates":
-		return errors.New("FX provider is not configured; no rates were fabricated")
+		return errors.New("scheduled FX collection is not configured; USD/CHF rates are imported with cmd/collector --yahoo")
 	case "rankings":
 		history, err := s.market.LoadLatestPriceHistory(ctx)
 		if err != nil {
