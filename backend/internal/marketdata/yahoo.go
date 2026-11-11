@@ -82,6 +82,42 @@ var yahooInstruments = []yahooInstrument{
 		},
 		ticker: "SPY", currency: "USD",
 	},
+	{
+		symbol: Symbol{
+			ID:       uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://finance.yahoo.com/quote/APP")).String(),
+			Symbol:   "APP",
+			Exchange: "NASDAQ",
+			Name:     "AppLovin Corporation",
+			Currency: "USD",
+			Sector:   "Technology",
+			Industry: "Software - Application",
+		},
+		ticker: "APP", currency: "USD",
+	},
+	{
+		symbol: Symbol{
+			ID:       uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://finance.yahoo.com/quote/CRWV")).String(),
+			Symbol:   "CRWV",
+			Exchange: "NASDAQ",
+			Name:     "CoreWeave, Inc.",
+			Currency: "USD",
+			Sector:   "Technology",
+			Industry: "Software - Infrastructure",
+		},
+		ticker: "CRWV", currency: "USD",
+	},
+	{
+		symbol: Symbol{
+			ID:       uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://finance.yahoo.com/quote/SOFI")).String(),
+			Symbol:   "SOFI",
+			Exchange: "NASDAQ",
+			Name:     "SoFi Technologies, Inc.",
+			Currency: "USD",
+			Sector:   "Financial Services",
+			Industry: "Credit Services",
+		},
+		ticker: "SOFI", currency: "USD",
+	},
 }
 
 type yahooChartResponse struct {
@@ -135,29 +171,18 @@ func NewYahooProvider() *YahooProvider {
 }
 
 func (p *YahooProvider) FetchBatch(ctx context.Context, from, to time.Time) (ImportBatch, error) {
-	if p.client == nil || p.baseURL == "" {
-		return ImportBatch{}, errors.New("Yahoo Finance client is not configured")
-	}
-	if from.IsZero() || to.IsZero() || from.After(to) {
-		return ImportBatch{}, errors.New("Yahoo Finance import requires an ascending date range")
+	if err := p.validateRange(from, to); err != nil {
+		return ImportBatch{}, err
 	}
 
 	batch := ImportBatch{}
 	observedDates := make(map[string]struct{})
 	for _, instrument := range yahooInstruments {
-		result, err := p.fetchChart(ctx, instrument.ticker, from, to)
+		bars, actions, err := p.fetchInstrument(ctx, instrument, from, to)
 		if err != nil {
 			return ImportBatch{}, err
-		}
-		if result.Meta.Currency != instrument.currency {
-			return ImportBatch{}, fmt.Errorf("Yahoo Finance returned currency %q for %s, expected %q",
-				result.Meta.Currency, instrument.ticker, instrument.currency)
 		}
 		batch.Symbols = append(batch.Symbols, instrument.symbol)
-		bars, actions, err := result.priceBars(instrument, from, to)
-		if err != nil {
-			return ImportBatch{}, err
-		}
 		batch.Prices = append(batch.Prices, bars...)
 		batch.CorporateActions = append(batch.CorporateActions, actions...)
 		if instrument.ticker == "SPY" {
@@ -183,6 +208,66 @@ func (p *YahooProvider) FetchBatch(ctx context.Context, from, to time.Time) (Imp
 		return ImportBatch{}, fmt.Errorf("validate Yahoo Finance data: %w", err)
 	}
 	return batch, nil
+}
+
+func (p *YahooProvider) FetchSymbolsBatch(ctx context.Context, from, to time.Time, symbols []string) (ImportBatch, error) {
+	if err := p.validateRange(from, to); err != nil {
+		return ImportBatch{}, err
+	}
+	if len(symbols) == 0 {
+		return ImportBatch{}, errors.New("Yahoo Finance symbol import requires at least one symbol")
+	}
+
+	instrumentsBySymbol := make(map[string]yahooInstrument, len(yahooInstruments))
+	for _, instrument := range yahooInstruments {
+		instrumentsBySymbol[instrument.symbol.Symbol] = instrument
+	}
+	batch := ImportBatch{}
+	seen := make(map[string]struct{}, len(symbols))
+	for _, symbol := range symbols {
+		symbol = strings.ToUpper(strings.TrimSpace(symbol))
+		instrument, ok := instrumentsBySymbol[symbol]
+		if !ok || instrument.ticker == "SPY" {
+			return ImportBatch{}, fmt.Errorf("Yahoo Finance symbol %q is not available for individual stock import", symbol)
+		}
+		if _, duplicate := seen[symbol]; duplicate {
+			return ImportBatch{}, fmt.Errorf("Yahoo Finance symbol %q was requested more than once", symbol)
+		}
+		seen[symbol] = struct{}{}
+		bars, actions, err := p.fetchInstrument(ctx, instrument, from, to)
+		if err != nil {
+			return ImportBatch{}, err
+		}
+		batch.Symbols = append(batch.Symbols, instrument.symbol)
+		batch.Prices = append(batch.Prices, bars...)
+		batch.CorporateActions = append(batch.CorporateActions, actions...)
+	}
+	if err := ValidateBatch(batch); err != nil {
+		return ImportBatch{}, fmt.Errorf("validate Yahoo Finance data: %w", err)
+	}
+	return batch, nil
+}
+
+func (p *YahooProvider) validateRange(from, to time.Time) error {
+	if p.client == nil || p.baseURL == "" {
+		return errors.New("Yahoo Finance client is not configured")
+	}
+	if from.IsZero() || to.IsZero() || from.After(to) {
+		return errors.New("Yahoo Finance import requires an ascending date range")
+	}
+	return nil
+}
+
+func (p *YahooProvider) fetchInstrument(ctx context.Context, instrument yahooInstrument, from, to time.Time) ([]PriceBar, []CorporateAction, error) {
+	result, err := p.fetchChart(ctx, instrument.ticker, from, to)
+	if err != nil {
+		return nil, nil, err
+	}
+	if result.Meta.Currency != instrument.currency {
+		return nil, nil, fmt.Errorf("Yahoo Finance returned currency %q for %s, expected %q",
+			result.Meta.Currency, instrument.ticker, instrument.currency)
+	}
+	return result.priceBars(instrument, from, to)
 }
 
 func (p *YahooProvider) fetchChart(ctx context.Context, ticker string, from, to time.Time) (yahooChartResult, error) {

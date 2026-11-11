@@ -50,7 +50,8 @@ func (r *MarketData) Import(ctx context.Context, batch marketdata.ImportBatch, d
 			ON CONFLICT (exchange, symbol) DO UPDATE SET
 				name = EXCLUDED.name, currency = EXCLUDED.currency,
 				sector = EXCLUDED.sector, industry = EXCLUDED.industry,
-				updated_at = now()`,
+				updated_at = now()
+			RETURNING id`,
 			symbol.ID, symbol.Symbol, symbol.Exchange, symbol.Name, symbol.Currency, symbol.Sector, symbol.Industry,
 		).Scan(&stockID)
 		if err != nil {

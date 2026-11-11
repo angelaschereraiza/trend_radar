@@ -4,7 +4,8 @@
 
 The collector supports explicit import modes:
 
-- `go run ./cmd/collector --yahoo` fetches up to ten years of daily data for Nestlé (`NESN.SW`), Novartis (`NOVN.SW`), Roche (`ROG.SW`), SPY, and USD/CHF (`USDCHF=X`) from Yahoo Finance's public chart endpoint. Run it from `backend` after configuring the database; `make import-yahoo` is the repository-root shortcut. This is a fixed initial ticker list, not a Yahoo-wide catalog.
+- `go run ./cmd/collector --yahoo` fetches up to ten years of daily data for Nestlé (`NESN.SW`), Novartis (`NOVN.SW`), Roche (`ROG.SW`), SPY, AppLovin (`APP`), CoreWeave (`CRWV`), SoFi (`SOFI`), and USD/CHF (`USDCHF=X`) from Yahoo Finance's public chart endpoint. Run it from `backend` after configuring the database; `make import-yahoo` is the repository-root shortcut. This is a fixed ticker list, not a Yahoo-wide catalog. Prices are daily observations (latest available close), not real-time quotes.
+- `go run ./cmd/collector --yahoo-symbols APP CRWV SOFI` imports selected supported equities without fetching the other configured tickers or FX rates. Use `make import-yahoo-symbols SYMBOLS='APP CRWV SOFI'` from the repository root. Each requested ticker must succeed; an unavailable ticker fails the import explicitly.
 - EODHD provides a broader, global active-common-stock catalog one exchange at a time and end-of-day history for selected listings. Set `EODHD_API_TOKEN` locally, then use `make import-eodhd-exchanges`, `make import-eodhd-catalog EXCHANGE=SW`, and `make import-eodhd-history EXCHANGE=SW SYMBOL=NOVN`. `SW` identifies the SIX Swiss Exchange. The history command defaults to the latest year and accepts optional `FROM` and `TO` dates.
 - `go run ./cmd/collector --fixture` imports deterministic synthetic data for tests/development only. It is not run by `make dev`; `make fixture-import` is the explicit shortcut.
 

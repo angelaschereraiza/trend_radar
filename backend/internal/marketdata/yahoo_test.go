@@ -18,6 +18,9 @@ func TestYahooProviderFetchBatch(t *testing.T) {
 		"NOVN.SW":  yahooTestChart("CHF", "Europe/Zurich", firstDate, secondDate, false),
 		"ROG.SW":   yahooTestChart("CHF", "Europe/Zurich", firstDate, secondDate, false),
 		"SPY":      yahooTestChart("USD", "America/New_York", firstDate, secondDate, false),
+		"APP":      yahooTestChart("USD", "America/New_York", firstDate, secondDate, false),
+		"CRWV":     yahooTestChart("USD", "America/New_York", firstDate, secondDate, false),
+		"SOFI":     yahooTestChart("USD", "America/New_York", firstDate, secondDate, false),
 		"USDCHF=X": yahooTestChart("CHF", "Europe/London", firstDate, secondDate, false),
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -43,9 +46,21 @@ func TestYahooProviderFetchBatch(t *testing.T) {
 	if err := ValidateBatch(batch); err != nil {
 		t.Fatalf("provider returned invalid batch: %v", err)
 	}
-	if len(batch.Symbols) != 4 || len(batch.Prices) != 8 || len(batch.FXRates) != 2 {
+	if len(batch.Symbols) != 7 || len(batch.Prices) != 14 || len(batch.FXRates) != 2 {
 		t.Fatalf("unexpected batch counts: symbols=%d prices=%d fx=%d",
 			len(batch.Symbols), len(batch.Prices), len(batch.FXRates))
+	}
+	for _, symbol := range []string{"APP", "CRWV", "SOFI"} {
+		found := false
+		for _, item := range batch.Symbols {
+			if item.Symbol == symbol && item.Currency == "USD" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Yahoo batch is missing USD symbol %s", symbol)
+		}
 	}
 	if batch.Prices[0].Symbol != "NESN" || batch.Prices[0].Currency != "CHF" ||
 		batch.Prices[0].Provider != yahooProviderName || batch.Prices[0].DataVersion == "" {
@@ -71,6 +86,48 @@ func TestYahooProviderRejectsUnexpectedCurrency(t *testing.T) {
 	if _, err := provider.FetchBatch(context.Background(), date, date); err == nil ||
 		!strings.Contains(err.Error(), `expected "CHF"`) {
 		t.Fatalf("unexpected currency was not rejected explicitly: %v", err)
+	}
+}
+
+func TestYahooProviderFetchSymbolsBatch(t *testing.T) {
+	firstDate := time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC)
+	secondDate := firstDate.AddDate(0, 0, 1)
+	requested := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ticker := strings.TrimPrefix(r.URL.Path, "/v8/finance/chart/")
+		requested[ticker] = true
+		if ticker != "APP" && ticker != "CRWV" && ticker != "SOFI" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(yahooTestChart("USD", "America/New_York", firstDate, secondDate, false)))
+	}))
+	defer server.Close()
+
+	provider := &YahooProvider{client: server.Client(), baseURL: server.URL}
+	batch, err := provider.FetchSymbolsBatch(context.Background(), firstDate, secondDate, []string{"APP", "CRWV", "SOFI"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateBatch(batch); err != nil {
+		t.Fatalf("provider returned invalid batch: %v", err)
+	}
+	if len(batch.Symbols) != 3 || len(batch.Prices) != 6 || len(batch.FXRates) != 0 {
+		t.Fatalf("unexpected selected-symbol batch counts: symbols=%d prices=%d fx=%d",
+			len(batch.Symbols), len(batch.Prices), len(batch.FXRates))
+	}
+	if len(requested) != 3 || !requested["APP"] || !requested["CRWV"] || !requested["SOFI"] {
+		t.Fatalf("provider fetched unexpected tickers: %v", requested)
+	}
+}
+
+func TestYahooProviderRejectsUnsupportedSelectedSymbol(t *testing.T) {
+	date := time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC)
+	provider := &YahooProvider{client: http.DefaultClient, baseURL: "http://unused"}
+	if _, err := provider.FetchSymbolsBatch(context.Background(), date, date, []string{"UNKNOWN"}); err == nil ||
+		!strings.Contains(err.Error(), `symbol "UNKNOWN" is not available`) {
+		t.Fatalf("unsupported symbol was not rejected explicitly: %v", err)
 	}
 }
 

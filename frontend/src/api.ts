@@ -138,7 +138,17 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(message)
   }
-  return await response.json() as T
+  try {
+    return await response.json() as T
+  } catch (cause) {
+    if (cause instanceof SyntaxError) {
+      throw new Error(
+        'The API returned invalid JSON. Check that Nginx proxies /api/ to the TrendRadar API and that the API service is running.',
+        { cause },
+      )
+    }
+    throw cause
+  }
 }
 
 export function percent(value: unknown): string {

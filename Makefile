@@ -4,7 +4,7 @@ SHELL := /bin/bash
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: dev db-up db-down generate test lint build migrate-up migrate-down fixture-import import-yahoo import-eodhd-exchanges import-eodhd-catalog import-eodhd-history
+.PHONY: dev db-up db-down generate test lint build migrate-up migrate-down fixture-import import-yahoo import-yahoo-symbols import-eodhd-exchanges import-eodhd-catalog import-eodhd-history
 
 dev:
 	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
@@ -35,6 +35,11 @@ dev:
 import-yahoo:
 	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
 	@set -a; . ./.env; set +a; cd $(BACKEND_DIR); go run ./cmd/collector --yahoo
+
+import-yahoo-symbols:
+	@if [ -z "$(SYMBOLS)" ]; then echo "Usage: make import-yahoo-symbols SYMBOLS='APP CRWV SOFI'"; exit 2; fi
+	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi
+	@set -a; . ./.env; set +a; cd $(BACKEND_DIR); go run ./cmd/collector --yahoo-symbols $(SYMBOLS)
 
 fixture-import:
 	@if [ ! -f .env ]; then echo "Missing .env; run: cp .env.example .env"; exit 1; fi

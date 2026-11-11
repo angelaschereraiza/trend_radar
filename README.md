@@ -25,13 +25,15 @@ The project is being implemented in the order defined by [the specification](doc
 
    To start or stop only PostgreSQL, use `make db-up` or `make db-down`.
 
-4. In a second terminal, import real daily data for Nestlé, Novartis, Roche, SPY and USD/CHF:
+4. In a second terminal, import real daily data for Nestlé, Novartis, Roche, SPY, AppLovin, CoreWeave, SoFi and USD/CHF:
 
    ```sh
    make import-yahoo
    ```
 
-   This downloads up to ten years of daily history for the configured Yahoo ticker list, then stores an explicitly survivorship-biased snapshot. The endpoint is unofficial, may change or be rate-limited, and its terms/licensing suitability are not guaranteed. Use it only for local/private research under the provider's applicable terms. The current list includes Nestlé, Novartis, Roche and SPY. CHF securities are displayed in CHF but excluded from the current USD-only rankings and backtests.
+   This downloads up to ten years of daily history for the configured Yahoo ticker list, then stores an explicitly survivorship-biased snapshot. The endpoint is unofficial, may change or be rate-limited, and its terms/licensing suitability are not guaranteed. Use it only for local/private research under the provider's applicable terms. Prices are daily (latest available close), not real-time quotes. CHF securities are displayed in CHF but excluded from the current USD-only rankings and backtests.
+
+   To import only selected supported equities without fetching the full Yahoo ticker list, use `make import-yahoo-symbols SYMBOLS='APP CRWV SOFI'`. This targeted import does not fetch USD/CHF and is intended for stock charts, not backtests.
 
 5. To browse broader global stock catalogs, get an EODHD API key, add it as `EODHD_API_TOKEN` in `.env`, then list supported exchange codes and import catalogs one exchange at a time:
 

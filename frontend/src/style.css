@@ -94,33 +94,12 @@ main {
   gap: 1.5rem;
 }
 
-.welcome {
-  padding: clamp(1.75rem, 5vw, 3.5rem);
-  background: linear-gradient(135deg, rgba(39, 111, 255, 0.13), transparent 70%), var(--card);
-  border: 1px solid var(--border);
-  border-radius: 1.25rem;
-  box-shadow: var(--shadow);
-}
-
-.welcome h1 {
-  margin: 0.75rem 0 1rem;
-  font-size: clamp(1rem, 6vw, 4rem);
-  letter-spacing: -0.055em;
-  line-height: 1.05;
-}
-
 .eyebrow {
   color: var(--accent-light);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.welcome > p:not(.eyebrow) {
-  color: var(--muted);
-  font-size: 1.1rem;
-  line-height: 1.7;
 }
 
 .ranking-card {

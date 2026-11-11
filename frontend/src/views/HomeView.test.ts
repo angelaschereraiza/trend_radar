@@ -43,6 +43,19 @@ describe('foundation views', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('HTTP 503')
   })
 
+  it('explains when the API route returns HTML instead of JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError(`Unexpected token '<', "<!doctype "... is not valid JSON`)
+      },
+    }))
+    const wrapper = mount(HomeView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('proxies /api/')
+  })
+
   it('renders the home route', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

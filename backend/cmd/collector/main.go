@@ -68,7 +68,13 @@ func main() {
 		to := time.Now().UTC()
 		from := to.AddDate(-10, 0, 0)
 		batch, err = marketdata.NewYahooProvider().FetchBatch(ctx, from, to)
-		description = "Yahoo Finance daily history for NESN, NOVN, ROG, SPY and USD/CHF; limited current universe"
+		description = "Yahoo Finance daily history for NESN, NOVN, ROG, SPY, APP, CRWV, SOFI and USD/CHF; limited current universe"
+	case "--yahoo-symbols":
+		to := time.Now().UTC()
+		from := to.AddDate(-10, 0, 0)
+		symbols := os.Args[2:]
+		batch, err = marketdata.NewYahooProvider().FetchSymbolsBatch(ctx, from, to, symbols)
+		description = "Yahoo Finance daily history for selected symbols: " + fmt.Sprint(symbols)
 	case "--fixture":
 		batch = marketdata.NewFixtureProvider().Batch()
 	case "--eodhd-catalog":
@@ -114,6 +120,8 @@ func validCollectorArgs(mode string, args []string) bool {
 	switch mode {
 	case "--fixture", "--yahoo", "--eodhd-exchanges":
 		return len(args) == 0
+	case "--yahoo-symbols":
+		return len(args) > 0
 	case "--eodhd-catalog":
 		return len(args) == 1
 	case "--eodhd-history":
@@ -147,6 +155,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "usage:")
 	fmt.Fprintln(os.Stderr, "  go run ./cmd/collector --fixture")
 	fmt.Fprintln(os.Stderr, "  go run ./cmd/collector --yahoo")
+	fmt.Fprintln(os.Stderr, "  go run ./cmd/collector --yahoo-symbols <symbol> [symbol...]")
 	fmt.Fprintln(os.Stderr, "  go run ./cmd/collector --eodhd-exchanges")
 	fmt.Fprintln(os.Stderr, "  go run ./cmd/collector --eodhd-catalog <exchange>")
 	fmt.Fprintln(os.Stderr, "  go run ./cmd/collector --eodhd-history <exchange> <ticker> [from YYYY-MM-DD to YYYY-MM-DD]")

@@ -26,11 +26,7 @@ const jobsError = ref('')
 
 onMounted(async () => {
   try {
-    const response = await fetch('/api/v1/rankings?limit=5')
-    if (!response.ok) {
-      throw new Error(`Rankings could not be loaded (HTTP ${response.status}).`)
-    }
-    const page = await response.json() as RankingPage
+    const page = await api<RankingPage>('/rankings?limit=5')
     rankings.value = page.items
     total.value = page.total
   } catch (cause) {
@@ -49,17 +45,6 @@ onMounted(async () => {
 
 <template>
   <section class="dashboard">
-    <div class="welcome">
-      <p class="eyebrow">
-        Research workspace
-      </p>
-      <h1>Understand the trends behind the market.</h1>
-      <p>
-        Explore transparent stock rankings and reproducible strategy research.
-        Results are research data, not investment advice.
-      </p>
-    </div>
-
     <section
       class="ranking-card"
       aria-labelledby="rankings-heading"
